@@ -25,6 +25,13 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 10 — Hotkey modifiers contaminate the SendInput Ctrl+C**
+When the hotkey fires (e.g. Ctrl+Shift+Q), the modifier keys are still physically held.
+SendInput then produces Ctrl+Shift+C instead of Ctrl+C — in Chrome this opens DevTools,
+not copy. Fix: use GetAsyncKeyState to detect held modifiers (Shift, Alt, Win) and inject
+key-up events for them before the Ctrl+C sequence. Do not re-press them; the physical key
+release will restore state naturally.
+
 **Lesson 9 — Ära lisa taustatriggereid ilma eksplitsiitse nõudeta**
 Global mouse hook (double-click capture) lisati eeldusena, et kasutaja tahab seda.
 Tegelikult tahtis kasutaja ainult hotkey-käivitust. Reegel: ära lisa taustamonitoringut
