@@ -10,9 +10,9 @@ If the text can't be selected normally (e.g. inside an image or a locked PDF), e
 
 ## How It Works
 
-1. Select any text with the mouse.
+1. Select any text and press **`Ctrl+C`** to copy it.
 2. Press the global hotkey (`Ctrl+Shift+F2` by default).
-3. QrApp captures the selection via clipboard, sanitizes it, generates the QR code, and opens the overlay.
+3. QrApp reads the clipboard, sanitizes the text, generates the QR code, and opens the overlay.
 4. Edit the text in the overlay if needed — the QR updates live.
 5. Press `Esc` or click away to close. Pressing the hotkey while the overlay is already open closes it and opens a fresh one.
 
@@ -79,9 +79,9 @@ QrApp/
 ## Functional Requirements
 
 ### Text Capture
-- Capture selected text on hotkey press via `SendInput` Ctrl+C → clipboard poll → restore clipboard
-- If clipboard capture returns empty, show tray notification "Nothing to encode" — no automatic OCR fallback
-- All clipboard operations include an 8-retry / 25 ms back-off to handle transient `CLIPBRD_E_CANT_OPEN` errors
+- On hotkey press, read text directly from the clipboard (user copies with `Ctrl+C` first)
+- If clipboard is empty or contains no text, show tray notification "Nothing to encode"
+- Clipboard read includes 8-retry / 25 ms back-off to handle transient `CLIPBRD_E_CANT_OPEN` errors
 
 ### Overlay
 - Open near the mouse cursor, clamped to the current monitor

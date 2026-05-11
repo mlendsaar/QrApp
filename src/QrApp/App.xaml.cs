@@ -82,7 +82,7 @@ public sealed partial class App : System.Windows.Application
     private async Task RunCapturePipelineAsync()
     {
         string raw;
-        try { raw = await _selectionService.GetSelectedTextAsync(); }
+        try { raw = _selectionService.GetClipboardText(); }
         catch { raw = string.Empty; }
 
         var text = _sanitizerService.Sanitize(raw);

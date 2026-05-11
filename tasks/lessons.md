@@ -25,6 +25,13 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 12 — SendInput Ctrl+C on hotkey is fragile; just read the clipboard**
+Synthesising Ctrl+C via SendInput has too many failure modes: modifier keys left held from
+the hotkey combo contaminate the injected keystrokes, different apps handle Ctrl+C differently,
+clipboard polling adds latency and race conditions. The correct solution is to let the user
+copy text themselves (Ctrl+C) and then press the hotkey to read the clipboard directly.
+This is zero-latency, zero-injection, and works in every application.
+
 **Lesson 11 — Ctrl+Shift+Q conflicts with Firefox (close all tabs)**
 Ctrl+Shift+Q is claimed by Firefox as "close all tabs". RegisterHotKey may silently fail
 or the browser intercepts the key before our hook. Use F-key combinations as default
