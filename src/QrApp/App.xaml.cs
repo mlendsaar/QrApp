@@ -97,7 +97,9 @@ public sealed partial class App : System.Windows.Application
 
     private async Task RunCapturePipelineAsync(bool useOcrFallback)
     {
-        var raw = await _selectionService.GetSelectedTextAsync();
+        string raw;
+        try { raw = await _selectionService.GetSelectedTextAsync(); }
+        catch { raw = string.Empty; }
 
         if (string.IsNullOrWhiteSpace(raw) && useOcrFallback)
             raw = await _ocrService.RecognizeCursorRegionAsync();
