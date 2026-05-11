@@ -169,13 +169,6 @@
                           Style="{StaticResource ToggleSwitch}"
                           AutomationProperties.Name="Show OCR Region button" />
 
-                <!-- Capture -->
-                <TextBlock Text="Capture" Style="{StaticResource SectionHeader}" />
-                <CheckBox Content="Generate QR on double-click"
-                          IsChecked="{Binding DoubleClickCapture}"
-                          Style="{StaticResource ToggleSwitch}"
-                          AutomationProperties.Name="Enable double-click QR capture" />
-
                 <!-- Startup -->
                 <TextBlock Text="Startup" Style="{StaticResource SectionHeader}" />
                 <CheckBox Content="Launch QrApp when Windows starts"

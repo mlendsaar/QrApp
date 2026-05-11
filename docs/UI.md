@@ -52,7 +52,7 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 
 ```
 ┌──────────────────────────────────────────────┐
-│  [⬡ OCR Region]                    [✕] Esc  │  ← 32 px header
+│  [⬡ OCR Region] (hidden by default)  [✕] Esc│  ← 32 px header
 ├─────────────────────┬────────────────────────┤
 │                     │                        │
 │  [Editable TextBox  │   QR code image        │
@@ -74,7 +74,7 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 
 ### Header Bar
 
-- **OCR Region button** (left): triggers `RegionSelectorWindow`; icon is a crosshair or scissors glyph from Segoe Fluent Icons
+- **OCR Region button** (left): hidden by default (`Visibility.Collapsed`); shown when `Overlay.ShowOcrButton = true` in settings. Triggers `RegionSelectorWindow`; icon is a crosshair glyph from Segoe Fluent Icons.
 - **Close button** (right): `✕`, same as `Esc`; 32×32 px touch target
 
 ### TextBox
@@ -167,6 +167,7 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 │                                                  │
 │  Overlay                                         │
 │  Auto-dismiss  [✓]  after  [5]  seconds          │
+│  [○] Show OCR Region button in overlay           │  ← toggle switch (default off)
 │                                                  │
 │  Startup                                         │
 │  [✓]  Launch QrApp when Windows starts           │
@@ -208,6 +209,14 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 
 - Options: `L — 7% recovery`, `M — 15% recovery`, `Q — 25% recovery (default)`, `H — 30% recovery`
 - ⓘ tooltip: `"Higher recovery = smaller data capacity. Q is a good default."`
+
+### Toggle Switches (Overlay and Capture sections)
+
+Toggle switches use a custom `CheckBox` template styled as a Windows 11-style pill toggle (40×20 px track, `#CCCCCC` off / `#0078D4` on, 16 px white thumb). The template is defined as `Style x:Key="ToggleSwitch"` in `SettingsWindow.xaml` resources.
+
+| Toggle | Default | Behaviour |
+|---|---|---|
+| Show OCR Region button | Off | Controls `Visibility.Collapsed/Visible` of the OCR button in `OverlayWindow` |
 
 ### Startup Checkbox
 

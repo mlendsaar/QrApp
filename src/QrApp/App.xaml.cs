@@ -13,7 +13,6 @@ public sealed partial class App : System.Windows.Application
     private readonly OcrService           _ocrService       = new();
     private readonly QrCodeService        _qrService        = new();
 
-    private MouseHookService     _mouseHookService = null!;
     private TextSanitizerService _sanitizerService = null!;
     private AppSettings          _settings         = null!;
     private NotifyIcon           _trayIcon         = null!;
@@ -30,10 +29,6 @@ public sealed partial class App : System.Windows.Application
         _settingsService.ApplyAutostart(_settings.Autostart);
         InitTray();
         RegisterHotkey();
-
-        // Install after the message loop is running (OnStartup is called from within Run)
-        _mouseHookService = new MouseHookService();
-        _mouseHookService.DoubleClicked += OnMouseDoubleClicked;
     }
 
     private void InitTray()
@@ -84,15 +79,6 @@ public sealed partial class App : System.Windows.Application
         await RunCapturePipelineAsync();
     }
 
-    private async void OnMouseDoubleClicked(object? sender, EventArgs e)
-    {
-        if (!_settings.Capture.DoubleClickCapture) return;
-        if (_overlay is not null) return;
-
-        await Task.Delay(120);
-        await RunCapturePipelineAsync();
-    }
-
     private async Task RunCapturePipelineAsync()
     {
         string raw;
@@ -131,7 +117,6 @@ public sealed partial class App : System.Windows.Application
     {
         _overlay?.Close();
         _hotkeyService.Dispose();
-        _mouseHookService.Dispose();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
         Shutdown();
@@ -140,7 +125,6 @@ public sealed partial class App : System.Windows.Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeyService.Dispose();
-        _mouseHookService.Dispose();
         _trayIcon?.Dispose();
         base.OnExit(e);
     }
