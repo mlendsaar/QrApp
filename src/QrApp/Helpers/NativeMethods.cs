@@ -11,16 +11,6 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
     [DllImport("user32.dll")] internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-    // Mouse hook
-    internal delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
-    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
-    [DllImport("user32.dll")] internal static extern bool UnhookWindowsHookEx(IntPtr hhk);
-    [DllImport("user32.dll")] internal static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)] internal static extern IntPtr GetModuleHandle(string? lpModuleName);
-    [DllImport("user32.dll")] internal static extern uint GetDoubleClickTime();
-
-    internal const int  WH_MOUSE_LL           = 14;
-    internal const int  WM_LBUTTONDOWN        = 0x0201;
     internal const int  WM_HOTKEY             = 0x0312;
     internal const int  MOD_CONTROL           = 0x0002;
     internal const int  MOD_SHIFT             = 0x0004;

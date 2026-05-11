@@ -169,9 +169,6 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 │  Auto-dismiss  [✓]  after  [5]  seconds          │
 │  [○] Show OCR Region button in overlay           │  ← toggle switch (default off)
 │                                                  │
-│  Capture                                         │
-│  [●] Generate QR on double-click                 │  ← toggle switch (default on)
-│                                                  │
 │  Startup                                         │
 │  [✓]  Launch QrApp when Windows starts           │
 │                                                  │
@@ -220,7 +217,6 @@ Toggle switches use a custom `CheckBox` template styled as a Windows 11-style pi
 | Toggle | Default | Behaviour |
 |---|---|---|
 | Show OCR Region button | Off | Controls `Visibility.Collapsed/Visible` of the OCR button in `OverlayWindow` |
-| Generate QR on double-click | On | Enables/disables `MouseHookService.DoubleClicked` handler in `App.xaml.cs` |
 
 ### Startup Checkbox
 

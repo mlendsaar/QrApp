@@ -25,6 +25,12 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 9 — Ära lisa taustatriggereid ilma eksplitsiitse nõudeta**
+Global mouse hook (double-click capture) lisati eeldusena, et kasutaja tahab seda.
+Tegelikult tahtis kasutaja ainult hotkey-käivitust. Reegel: ära lisa taustamonitoringut
+ega automaatset käivitamist (hookid, timers, watchers) ilma selgesõnalise nõudeta.
+App peab olema täiesti passiivne kuni kasutaja seda hotkey'ga käivitab.
+
 **Lesson 8 — Don't auto-fallback to OCR; trust the user's selection**
 The original hotkey pipeline fell back to OcrService.RecognizeCursorRegionAsync() when the
 clipboard was empty. This captured a large 600×400 region which is never what the user wanted.

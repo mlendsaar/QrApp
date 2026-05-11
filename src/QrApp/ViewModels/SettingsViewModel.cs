@@ -126,18 +126,10 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
         set { _working.Autostart = value; OnPropertyChanged(); }
     }
 
-    // ── Capture ──────────────────────────────────────────────────────────────
-
     public bool ShowOcrButton
     {
         get => _working.Overlay.ShowOcrButton;
         set { _working.Overlay.ShowOcrButton = value; OnPropertyChanged(); }
-    }
-
-    public bool DoubleClickCapture
-    {
-        get => _working.Capture.DoubleClickCapture;
-        set { _working.Capture.DoubleClickCapture = value; OnPropertyChanged(); }
     }
 
     // ── Symbol Filter ────────────────────────────────────────────────────────
@@ -197,7 +189,6 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
         Qr        = new QrCodeConfig { TargetSizePx = src.Qr.TargetSizePx, EccLevel = src.Qr.EccLevel },
         Overlay   = new OverlayConfig { AutoDismissSeconds = src.Overlay.AutoDismissSeconds, ShowOcrButton = src.Overlay.ShowOcrButton },
         Autostart = src.Autostart,
-        Capture   = new CaptureConfig { DoubleClickCapture = src.Capture.DoubleClickCapture },
         Sanitizer = new SanitizerConfig { Rules = src.Sanitizer.Rules.Select(r => r with { }).ToList() },
     };
 
