@@ -25,6 +25,12 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 7 — Clipboard.Clear() / all clipboard calls can throw CLIPBRD_E_CANT_OPEN**
+`Clipboard.Clear()` (and all WPF Clipboard methods) throw `COMException 0x800401D0` when another
+process holds the clipboard open. The existing retry only covered the poll loop; wrap every
+clipboard entry point in a retry helper (8 × 25 ms back-off). Also add a top-level catch in the
+pipeline caller so a clipboard failure degrades gracefully instead of crashing the app.
+
 **Lesson 6 — Always commit and push without being asked**
 After completing any task or set of changes, always run `git add`, `git commit`, and `git push` autonomously.
 Never wait for the user to request it. If a PR doesn't exist yet, create one as a draft.

@@ -10,7 +10,10 @@ internal sealed class SelectionService
         IDataObject? saved = null;
         try { saved = Clipboard.GetDataObject(); } catch { }
 
-        Clipboard.Clear();
+        // Clipboard may be locked briefly by another process; retry before giving up
+        if (!await TryClipboardActionAsync(() => Clipboard.Clear()))
+            return string.Empty;
+
         SendCtrlC();
 
         var deadline = DateTime.UtcNow.AddMilliseconds(300);
@@ -22,11 +25,24 @@ internal sealed class SelectionService
             {
                 if (Clipboard.ContainsText()) { result = Clipboard.GetText(); break; }
             }
-            catch { await Task.Delay(20); } // clipboard contention retry
+            catch { await Task.Delay(20); }
         }
 
         try { if (saved is not null) Clipboard.SetDataObject(saved, true); } catch { }
         return result.Trim();
+    }
+
+    // Retries a clipboard action up to 8 times with 25 ms back-off between attempts.
+    private static async Task<bool> TryClipboardActionAsync(Action action)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            try { action(); return true; }
+            catch (COMException) { }
+            catch (ExternalException) { }
+            await Task.Delay(25);
+        }
+        return false;
     }
 
     private static void SendCtrlC()
