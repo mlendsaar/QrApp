@@ -47,21 +47,36 @@ internal sealed class SelectionService
 
     private static void SendCtrlC()
     {
-        var inputs = new NativeMethods.INPUT[4];
-        inputs[0].type = NativeMethods.INPUT_KEYBOARD;
-        inputs[0].ki.wVk = 0x11; // VK_CONTROL down
+        // The hotkey combo (e.g. Ctrl+Shift+Q) leaves modifier keys physically held when
+        // this runs. Release Shift / Alt / Win so the target app sees plain Ctrl+C, not
+        // Ctrl+Shift+C (which opens DevTools in Chrome instead of copying).
+        ushort[] interferingKeys = [0x10, 0x12, 0x5B, 0x5C]; // Shift, Alt, LWin, RWin
+        var toRelease = interferingKeys
+            .Where(vk => (NativeMethods.GetAsyncKeyState(vk) & 0x8000) != 0)
+            .ToArray();
 
-        inputs[1].type = NativeMethods.INPUT_KEYBOARD;
-        inputs[1].ki.wVk = NativeMethods.VK_C; // VK_C down
+        var inputs = new NativeMethods.INPUT[toRelease.Length + 4];
+        int i = 0;
 
-        inputs[2].type = NativeMethods.INPUT_KEYBOARD;
-        inputs[2].ki.wVk = NativeMethods.VK_C;
-        inputs[2].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP; // VK_C up
+        foreach (var vk in toRelease)
+        {
+            inputs[i].type = NativeMethods.INPUT_KEYBOARD;
+            inputs[i].ki.wVk = vk;
+            inputs[i].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP;
+            i++;
+        }
 
-        inputs[3].type = NativeMethods.INPUT_KEYBOARD;
-        inputs[3].ki.wVk = 0x11;
-        inputs[3].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP; // VK_CONTROL up
+        inputs[i].type = NativeMethods.INPUT_KEYBOARD;
+        inputs[i].ki.wVk = 0x11; i++;                                    // Ctrl down
+        inputs[i].type = NativeMethods.INPUT_KEYBOARD;
+        inputs[i].ki.wVk = NativeMethods.VK_C; i++;                      // C down
+        inputs[i].type = NativeMethods.INPUT_KEYBOARD;
+        inputs[i].ki.wVk = NativeMethods.VK_C;
+        inputs[i].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP; i++;       // C up
+        inputs[i].type = NativeMethods.INPUT_KEYBOARD;
+        inputs[i].ki.wVk = 0x11;
+        inputs[i].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP;            // Ctrl up
 
-        NativeMethods.SendInput(4, inputs, Marshal.SizeOf<NativeMethods.INPUT>());
+        NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeMethods.INPUT>());
     }
 }

@@ -10,6 +10,7 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out POINT lpPoint);
     [DllImport("user32.dll")] internal static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
     [DllImport("user32.dll")] internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+    [DllImport("user32.dll")] internal static extern short GetAsyncKeyState(int vKey);
 
     internal const int  WM_HOTKEY             = 0x0312;
     internal const int  MOD_CONTROL           = 0x0002;
