@@ -155,11 +155,11 @@
 
 ## Phase 5 — Build and Verify
 
-- [ ] **`dotnet build` with zero warnings**
+- [x] **`dotnet build` with zero warnings**
   - Treat nullable warnings as errors during review
   - Fix all `CS8600`–`CS8625` nullability issues before proceeding
 
-- [ ] **`dotnet publish` self-contained EXE**
+- [x] **`dotnet publish` self-contained EXE**
   ```
   dotnet publish src/QrApp -c Release -r win-x64 --self-contained true \
       -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
