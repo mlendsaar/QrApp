@@ -4,17 +4,25 @@ A lightweight .NET 8 Windows 11 application that instantly generates a QR code f
 
 ## What It Does
 
-Select any text anywhere on your desktop — a URL, phone number, address, Wi-Fi password, or any string — trigger the hotkey, and QrApp shows a floating overlay with the captured text in an editable box and the generated QR code alongside it. No copy-paste, no manual typing.
+Select any text anywhere on your desktop — a URL, phone number, address, Wi-Fi password, or any string — trigger the hotkey or simply double-click a word, and QrApp shows a floating overlay with the captured text in an editable box and the generated QR code alongside it. No copy-paste, no manual typing.
 
-If the text can't be selected normally (e.g. inside an image or a locked PDF), click the OCR button in the overlay to draw a region on screen — just like Snipping Tool — and QrApp reads the text from that area automatically.
+If the text can't be selected normally (e.g. inside an image or a locked PDF), enable the OCR button in Settings and click it in the overlay to draw a screen region — just like Snipping Tool — and QrApp reads the text from that area.
 
 ## How It Works
 
-1. Select text anywhere on screen.
+**Hotkey flow:**
+1. Select any text with the mouse.
 2. Press the global hotkey (`Ctrl+Shift+Q` by default).
-3. QrApp captures the selection, sanitizes it, generates the QR code, and opens the overlay.
+3. QrApp captures the selection via clipboard, sanitizes it, generates the QR code, and opens the overlay.
 4. Edit the text in the overlay if needed — the QR updates live.
-5. Press `Esc` or click away to close. If the hotkey is pressed while the overlay is already open, it closes and a fresh one opens.
+5. Press `Esc` or click away to close. Pressing the hotkey while the overlay is already open closes it and opens a fresh one.
+
+**Double-click flow:**
+1. Double-click any word in any app (e.g. a browser).
+2. QrApp detects the double-click via a global mouse hook, waits 120 ms for the word to be selected, then captures it automatically — no hotkey required.
+3. The overlay opens just as in the hotkey flow.
+
+Both flows capture only what you have explicitly selected. There is no automatic OCR fallback — OCR is a manual action via the overlay button (hidden by default; enable in Settings).
 
 ## Tech Stack
 
@@ -42,6 +50,7 @@ QrApp/
 │       ├── SettingsWindow.xaml / .cs      # Settings dialog
 │       ├── Services/
 │       │   ├── HotkeyService.cs
+│       │   ├── MouseHookService.cs
 │       │   ├── SelectionService.cs
 │       │   ├── OcrService.cs
 │       │   ├── TextSanitizerService.cs
@@ -77,15 +86,16 @@ QrApp/
 ## Functional Requirements
 
 ### Text Capture
-- Capture selected text via `SendInput` → clipboard → restore on hotkey press
-- Fall back to `Windows.Media.Ocr` (cursor-region screenshot) when clipboard capture returns empty
-- Restore clipboard after every capture attempt
+- **Hotkey trigger**: press the global hotkey with text selected → capture via `SendInput` Ctrl+C → clipboard → restore clipboard
+- **Double-click trigger**: global `WH_MOUSE_LL` mouse hook detects double-click → 120 ms delay → same clipboard capture; toggleable in Settings (default: on)
+- If clipboard capture returns empty, show tray notification "Nothing to encode" — no automatic OCR fallback
+- All clipboard operations include an 8-retry / 25 ms back-off to handle transient `CLIPBRD_E_CANT_OPEN` errors
 
 ### Overlay
 - Open near the mouse cursor, clamped to the current monitor
 - Show captured text in an editable `TextBox` alongside the QR code
 - Regenerate QR in real time as the user edits (150 ms debounce)
-- **OCR button**: hides overlay, shows `RegionSelectorWindow` for user to draw a screen region; OCRs that region and populates the text box
+- **OCR button** (hidden by default; enable in Settings → Overlay): hides overlay, shows `RegionSelectorWindow` for user to draw a screen region; OCRs that region and populates the text box
 - Status bar: warning at 80–100% QR capacity; error above 100% ("Too much data — edit the text to reduce it.")
 - Dismiss on focus loss or `Esc`; optional auto-dismiss timer
 - If hotkey pressed while overlay is open: close the current overlay and open a fresh one
@@ -105,6 +115,8 @@ QrApp/
 - QR target size slider (200–600 px)
 - ECC level dropdown (L / M / Q / H)
 - Overlay auto-dismiss toggle + seconds
+- **Show OCR Region button** toggle switch (default: off)
+- **Generate QR on double-click** toggle switch (default: on)
 - Launch at Windows startup toggle (default: on)
 - Symbol filter rule list (match, replacement, regex toggle, add/delete)
 - Apply saves immediately; Cancel discards changes

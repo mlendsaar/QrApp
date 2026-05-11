@@ -8,32 +8,33 @@ QrApp is a single-process WPF application targeting `net8.0-windows10.0.22000.0`
 ┌──────────────────────────────────────────────────────────────────────┐
 │                           QrApp Process                              │
 │                                                                      │
-│  ┌──────────────┐  triggers  ┌─────────────────┐                    │
-│  │ HotkeyService│───────────▶│ SelectionService │                    │
-│  └──────────────┘            └────────┬────────┘                    │
-│   (if overlay open:                   │ text (may be empty)         │
-│    close it, open new)                ▼                              │
-│                              ┌─────────────────┐                    │
-│                              │   OcrService     │ ← auto fallback   │
-│                              │ (cursor region)  │                    │
-│                              └────────┬────────┘                    │
-│                                       │ raw text                     │
-│                                       ▼                              │
+│  ┌───────────────┐  hotkey   ┌──────────────────────────────────┐   │
+│  │ HotkeyService │──────────▶│                                  │   │
+│  └───────────────┘           │     RunCapturePipelineAsync       │   │
+│                              │                                  │   │
+│  ┌───────────────┐ dbl-click │  SelectionService                │   │
+│  │MouseHookService├──────────▶│  (Ctrl+C → clipboard poll)      │   │
+│  │ (WH_MOUSE_LL) │  +120 ms  │                                  │   │
+│  └───────────────┘  delay    │  empty? → "Nothing to encode"    │   │
+│                              └─────────────┬────────────────────┘   │
+│                                            │ raw text                │
+│                                            ▼                         │
 │                           ┌──────────────────────┐                  │
 │                           │ TextSanitizerService  │                  │
 │                           └──────────┬───────────┘                  │
 │                                      │ clean text                    │
-│                                      ▼                              │
+│                                      ▼                               │
 │                              ┌───────────────┐                      │
 │                              │ QrCodeService │                      │
 │                              └───────┬───────┘                      │
 │                                      │ BitmapSource                  │
-│                                      ▼                              │
-│                        ┌──────────────────────────┐                 │
-│                        │       OverlayWindow        │                │
-│                        │  [TextBox] [QR] [OCR btn] │                │
-│                        └──────────┬───────────────┘                 │
-│                                   │ OCR button click                 │
+│                                      ▼                               │
+│                        ┌─────────────────────────────┐              │
+│                        │        OverlayWindow          │             │
+│                        │  [TextBox] [QR]               │             │
+│                        │  [OCR btn — hidden by default]│             │
+│                        └──────────┬──────────────────┘              │
+│                                   │ OCR button click (manual only)   │
 │                                   ▼                                  │
 │                        ┌──────────────────────────┐                 │
 │                        │  RegionSelectorWindow     │                 │
@@ -58,11 +59,13 @@ QrApp is a single-process WPF application targeting `net8.0-windows10.0.22000.0`
 ### App.xaml.cs — Application Bootstrap
 
 - Sets `ShutdownMode = OnExplicitShutdown` so the app runs without a visible window.
-- Composes all services: `HotkeyService`, `SelectionService`, `OcrService`, `TextSanitizerService`, `QrCodeService`, `SettingsService`.
+- Composes all services: `HotkeyService`, `MouseHookService`, `SelectionService`, `OcrService`, `TextSanitizerService`, `QrCodeService`, `SettingsService`.
 - Owns `NotifyIcon` (tray) and its right-click menu (Settings, Quit).
-- Subscribes to `HotkeyService.HotkeyPressed`:
-  - If an overlay is currently open → close it, then run the full capture pipeline for a fresh one.
-  - Otherwise → run the capture pipeline directly.
+- `MouseHookService` is instantiated in `OnStartup` (not as a field initializer) so the WPF message loop is running before `SetWindowsHookEx` is called.
+- Both `HotkeyService.HotkeyPressed` and `MouseHookService.DoubleClicked` route to the shared `RunCapturePipelineAsync()`:
+  - Hotkey: closes any existing overlay first, then runs the pipeline.
+  - Double-click: skipped if overlay already open; 120 ms delay before running.
+- `RunCapturePipelineAsync()`: calls `SelectionService` → sanitize → generate → show overlay. If nothing captured, shows tray balloon "Nothing to encode". No automatic OCR fallback.
 - On startup: applies autostart registry setting from `SettingsService`.
 
 ### HotkeyService
@@ -79,6 +82,22 @@ void Unregister();
 
 **Behaviour when overlay is open:** App closes the existing `OverlayWindow`, then runs the capture pipeline to open a fresh one. This avoids overlapping overlays.
 
+### MouseHookService
+
+Detects global double-clicks by installing a `WH_MOUSE_LL` low-level mouse hook via `SetWindowsHookEx`.
+
+**Algorithm:**
+
+1. On each `WM_LBUTTONDOWN`, compare current time with the previous click timestamp.
+2. If the gap ≤ `GetDoubleClickTime()` (system setting, typically 500 ms), fire `DoubleClicked` event and reset the timestamp to prevent triple-clicks from re-triggering.
+3. The hook callback runs on the UI thread (the thread that installed the hook); the callback itself is fast — all heavy work is deferred.
+
+```csharp
+event EventHandler DoubleClicked;
+```
+
+The delegate reference is stored in a field to prevent GC collection while the hook is active. `Dispose()` calls `UnhookWindowsHookEx`.
+
 ### SelectionService
 
 Captures the currently selected text by synthesising `Ctrl+C`.
@@ -86,32 +105,26 @@ Captures the currently selected text by synthesising `Ctrl+C`.
 **Algorithm:**
 
 1. Save clipboard contents.
-2. Clear clipboard.
+2. Clear clipboard (with retry — see below).
 3. `SendInput`: VK_CONTROL down → VK_C down → VK_C up → VK_CONTROL up.
 4. Poll `Clipboard.ContainsText()` for up to 300 ms.
 5. Read text; restore clipboard.
 6. Return text, or empty string if nothing captured.
 
+**Clipboard retry:** All `Clipboard.*` entry points can throw `COMException 0x800401D0` (`CLIPBRD_E_CANT_OPEN`) when another process (antivirus, clipboard manager, etc.) holds the clipboard. A `TryClipboardActionAsync` helper retries up to 8 times with 25 ms back-off before giving up and returning empty.
+
 **Edge cases:**
 
 | Scenario | Handling |
 |---|---|
-| App ignores Ctrl+C | Returns empty → `OcrService` auto-fallback triggered |
-| Clipboard locked | Retry up to 5× with 20 ms delay |
+| App ignores Ctrl+C | Returns empty → "Nothing to encode" tray notification |
+| Clipboard locked | Retry 8× with 25 ms back-off; return empty on all failures |
 | Only whitespace selected | Treated as empty after sanitization |
 | Text exceeds QR v40 limit | `QrCodeService` throws; overlay shows error |
 
 ### OcrService
 
-Two modes — both return plain text.
-
-**Auto-fallback** (called when `SelectionService` returns empty):
-
-1. `GetCursorPos` to find cursor position.
-2. Capture a ~600×400 px region centred on the cursor via `Graphics.CopyFromScreen`.
-3. Convert to `SoftwareBitmap` (WinRT).
-4. `OcrEngine.RecognizeAsync(softwareBitmap)` — returns in ~50 ms.
-5. Concatenate line text and return.
+One mode — manual region selection. There is no automatic OCR fallback; OCR is only triggered when the user explicitly clicks the OCR button in the overlay.
 
 **Manual region** (called after user draws a region in `RegionSelectorWindow`):
 
@@ -126,7 +139,6 @@ internal sealed class OcrService
         OcrEngine.TryCreateFromUserProfileLanguages() ??
         OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en"));
 
-    public Task<string> RecognizeCursorRegionAsync() { ... }
     public Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect) { ... }
 
     private async Task<string> RecognizeBitmapAsync(System.Drawing.Bitmap bmp)
@@ -234,7 +246,7 @@ record QrSettings(int TargetSizePx = 300, QRCodeGenerator.ECCLevel EccLevel = QR
 Borderless, `AllowsTransparency="True"` WPF window. Positioned 16 px to the right of the mouse cursor, clamped to the current monitor's work area; flips left if insufficient space.
 
 - Two-column layout: editable `TextBox` (left) + QR `Image` (right).
-- **OCR button** in the header bar — clicking it:
+- **OCR button** in the header bar (hidden by default; controlled by `Overlay.ShowOcrButton` setting) — clicking it:
   1. Hides `OverlayWindow`.
   2. Awaits `RegionSelectorWindow.SelectAsync()`.
   3. If cancelled: re-shows with previous content.
@@ -256,6 +268,8 @@ Standard WPF window, opened from the tray right-click menu. Binds to `SettingsVi
 | `Slider` 200–600, step 50 | QR target size (px); live preview thumbnail |
 | `ComboBox` L/M/Q/H | ECC level |
 | `CheckBox` + seconds field | Overlay auto-dismiss |
+| Toggle switch | Show OCR Region button in overlay (default: off) |
+| Toggle switch | Generate QR on double-click (default: on) |
 | `CheckBox` | Launch at Windows startup |
 | Editable rule list | Symbol filter rules (match, replace, regex, delete) |
 
@@ -318,9 +332,13 @@ internal sealed class SettingsService
     "eccLevel": "Q"
   },
   "overlay": {
-    "autoDismissSeconds": 0
+    "autoDismissSeconds": 0,
+    "showOcrButton": false
   },
   "autostart": true,
+  "capture": {
+    "doubleClickCapture": true
+  },
   "sanitizer": {
     "rules": [
       { "match": "\\uFEFF", "replace": "" },
@@ -356,10 +374,10 @@ QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping
 
 | Thread | Responsibilities |
 |---|---|
-| UI thread (STA) | WPF, `HwndSource`, `Clipboard`, `SendInput`, `OcrService`, `RegionSelectorWindow` |
+| UI thread (STA) | WPF, `HwndSource`, `Clipboard`, `SendInput`, `OcrService`, `RegionSelectorWindow`, `MouseHookService` callbacks |
 | None (v1) | QR generation is < 20 ms on the UI thread; no background task needed |
 
-`SelectionService` and `OcrService` require STA: `SendInput`, `Clipboard`, `Graphics.CopyFromScreen`, and WinRT `SoftwareBitmap` conversion all have STA affinity.
+`SelectionService` and `OcrService` require STA: `SendInput`, `Clipboard`, `Graphics.CopyFromScreen`, and WinRT `SoftwareBitmap` conversion all have STA affinity. `MouseHookService` callbacks are delivered on the thread that installed the hook (the UI/STA thread), so no cross-thread dispatch is needed — only a `Task.Delay(120)` before the clipboard call.
 
 ---
 
@@ -367,10 +385,12 @@ QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping
 
 | Condition | Behaviour |
 |---|---|
-| Empty selection + empty OCR | Tray tooltip "Nothing to encode" for 2 s; no overlay |
+| Empty selection (hotkey or double-click) | Tray balloon "Nothing to encode" for 2 s; no overlay |
+| `CLIPBRD_E_CANT_OPEN` | Retry 8× / 25 ms; return empty on persistent failure |
 | Text > v40 capacity | Overlay error: "Too much data — edit the text to reduce it." |
 | Text 80–100% of capacity | Overlay warning: "Approaching QR capacity — consider reducing text or switching to ECC L." |
 | Hotkey already registered | Tray balloon: "Hotkey in use — change it in Settings" |
+| Double-click while overlay is open | Ignored (overlay stays open) |
 | `settings.json` corrupted | Reset to defaults silently, overwrite file |
 | OCR region cancelled | Overlay re-shows with previous content unchanged |
 
@@ -406,8 +426,8 @@ QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping
 | Operation | Target |
 |---|---|
 | Hotkey → overlay visible | < 250 ms (including clipboard capture and QR generation) |
+| Double-click → overlay visible | < 400 ms (120 ms delay + clipboard capture + QR generation) |
 | QR regeneration on text edit | < 50 ms (debounced 150 ms before triggering) |
-| OCR auto-fallback | < 500 ms |
 | OCR manual region | < 500 ms after user releases mouse |
 | Settings window open | < 100 ms |
 

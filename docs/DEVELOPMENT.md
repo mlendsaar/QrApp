@@ -86,6 +86,7 @@ Files to create:
 
 ```
 Services/HotkeyService.cs
+Services/MouseHookService.cs
 Services/SelectionService.cs
 Services/OcrService.cs
 Services/TextSanitizerService.cs
@@ -109,16 +110,17 @@ Build in this sequence — each step is independently runnable:
 
 1. **`NativeMethods.cs`** — P/Invoke signatures only; no logic.
 2. **`HotkeyService.cs`** — Register hotkey; verify `WM_HOTKEY` fires in debug output.
-3. **`SettingsService.cs`** — Load/save JSON; verify corruption handling manually.
-4. **`TextSanitizerService.cs`** — Rule engine with default rules; verify manually.
-5. **`SelectionService.cs`** — Clipboard capture via `SendInput`.
-6. **`OcrService.cs`** — Both modes (cursor region + explicit rect); verify manually against on-screen text.
-7. **`QrCodeService.cs`** — Generate QR; derive `PixelsPerModule` from `TargetSizePx`; verify output is scannable.
-8. **`OverlayViewModel.cs`** — `QrImage`, `SourceText`, `StatusText`; wire 150 ms debounce.
-9. **`RegionSelectorWindow.xaml`** — Fullscreen transparent canvas, mouse selection, returns `Rectangle?`.
-10. **`OverlayWindow.xaml`** — TextBox, QR image, OCR button, status bar; wire to ViewModel.
-11. **`SettingsViewModel.cs`** + **`SettingsWindow.xaml`** — Working copy, Apply/Cancel, all controls.
-12. **`App.xaml.cs`** — Compose everything; tray icon; overlay-already-open handling.
+3. **`MouseHookService.cs`** — Install `WH_MOUSE_LL`; verify double-click event fires.
+4. **`SettingsService.cs`** — Load/save JSON; verify corruption handling manually.
+5. **`TextSanitizerService.cs`** — Rule engine with default rules; verify manually.
+6. **`SelectionService.cs`** — Clipboard capture via `SendInput` with retry helper.
+7. **`OcrService.cs`** — Manual region mode only; verify manually against on-screen text.
+8. **`QrCodeService.cs`** — Generate QR; derive `PixelsPerModule` from `TargetSizePx`; verify output is scannable.
+9. **`OverlayViewModel.cs`** — `QrImage`, `SourceText`, `StatusText`; wire 150 ms debounce.
+10. **`RegionSelectorWindow.xaml`** — Fullscreen transparent canvas, mouse selection, returns `Rectangle?`.
+11. **`OverlayWindow.xaml`** — TextBox, QR image, OCR button (hidden by default), status bar; wire to ViewModel.
+12. **`SettingsViewModel.cs`** + **`SettingsWindow.xaml`** — Working copy, Apply/Cancel, all controls including toggle switches.
+13. **`App.xaml.cs`** — Compose everything; tray icon; `RunCapturePipelineAsync`; overlay-already-open handling.
 
 ---
 
@@ -138,6 +140,16 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
     [DllImport("user32.dll")] internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
+    // Mouse hook
+    internal delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+    [DllImport("user32.dll")] internal static extern bool UnhookWindowsHookEx(IntPtr hhk);
+    [DllImport("user32.dll")] internal static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)] internal static extern IntPtr GetModuleHandle(string? lpModuleName);
+    [DllImport("user32.dll")] internal static extern uint GetDoubleClickTime();
+
+    internal const int  WH_MOUSE_LL          = 14;
+    internal const int  WM_LBUTTONDOWN       = 0x0201;
     internal const int  WM_HOTKEY            = 0x0312;
     internal const int  MOD_CONTROL          = 0x0002;
     internal const int  MOD_SHIFT            = 0x0004;
@@ -191,6 +203,54 @@ internal sealed class HotkeyService : IDisposable
 }
 ```
 
+### MouseHookService.cs
+
+```csharp
+internal sealed class MouseHookService : IDisposable
+{
+    public event EventHandler? DoubleClicked;
+
+    private readonly NativeMethods.LowLevelMouseProc _proc; // must keep ref to prevent GC
+    private IntPtr _hookHandle;
+    private DateTime _lastClickTime = DateTime.MinValue;
+
+    public MouseHookService()
+    {
+        _proc = HookCallback;
+        var hMod = NativeMethods.GetModuleHandle(
+            System.Diagnostics.Process.GetCurrentProcess().MainModule?.ModuleName);
+        _hookHandle = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, _proc, hMod, 0);
+    }
+
+    private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && wParam == (IntPtr)NativeMethods.WM_LBUTTONDOWN)
+        {
+            var now = DateTime.UtcNow;
+            var threshold = TimeSpan.FromMilliseconds(NativeMethods.GetDoubleClickTime());
+            if (now - _lastClickTime <= threshold)
+            {
+                _lastClickTime = DateTime.MinValue; // prevent triple-click re-trigger
+                DoubleClicked?.Invoke(this, EventArgs.Empty);
+            }
+            else { _lastClickTime = now; }
+        }
+        return NativeMethods.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+    }
+
+    public void Dispose()
+    {
+        if (_hookHandle != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_hookHandle);
+            _hookHandle = IntPtr.Zero;
+        }
+    }
+}
+```
+
+> **Important:** construct `MouseHookService` in `OnStartup`, not as a field initializer — the WPF message loop must be running before `SetWindowsHookEx` is called.
+
 ### SelectionService.cs
 
 ```csharp
@@ -201,7 +261,10 @@ internal sealed class SelectionService
         IDataObject? saved = null;
         try { saved = Clipboard.GetDataObject(); } catch { }
 
-        Clipboard.Clear();
+        // Clipboard may be locked briefly; retry before giving up
+        if (!await TryClipboardActionAsync(() => Clipboard.Clear()))
+            return string.Empty;
+
         SendCtrlC();
 
         var deadline = DateTime.UtcNow.AddMilliseconds(300);
@@ -209,11 +272,25 @@ internal sealed class SelectionService
         while (DateTime.UtcNow < deadline)
         {
             await Task.Delay(30);
-            if (Clipboard.ContainsText()) { result = Clipboard.GetText(); break; }
+            try { if (Clipboard.ContainsText()) { result = Clipboard.GetText(); break; } }
+            catch { await Task.Delay(20); }
         }
 
         try { if (saved is not null) Clipboard.SetDataObject(saved, true); } catch { }
         return result.Trim();
+    }
+
+    // Retries a clipboard action up to 8 times with 25 ms back-off.
+    private static async Task<bool> TryClipboardActionAsync(Action action)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            try { action(); return true; }
+            catch (COMException) { }
+            catch (ExternalException) { }
+            await Task.Delay(25);
+        }
+        return false;
     }
 
     private static void SendCtrlC()
@@ -430,7 +507,9 @@ Output: `publish/QrApp.exe` (~70 MB). Runs on any Windows 11 machine with no pre
 | Problem | Solution |
 |---|---|
 | Hotkey not firing | Use `nirsoft HotkeysList` to check conflicts. Change hotkey in Settings. |
-| Empty selection | Test in Notepad first. Some apps (Electron, terminals) ignore synthesised `Ctrl+C` — OCR fallback should kick in automatically. |
+| Empty selection | Test in Notepad first. Some apps (Electron, terminals) ignore synthesised `Ctrl+C` — use the OCR Region button in the overlay as a manual fallback (enable it in Settings → Overlay). |
+| Double-click not triggering | Check Settings → Capture: "Generate QR on double-click" must be on. Ensure no overlay is already open. |
+| Double-click captures wrong text | Increase the 120 ms delay in `OnMouseDoubleClicked` if the target app is slow to update its selection. |
 | Overlay flickers | Ensure both `AllowsTransparency="True"` and `WindowStyle="None"` are set; `Background` must be non-null. |
 | QR looks blurry | Set `RenderOptions.BitmapScalingMode="NearestNeighbor"` and `UseLayoutRounding="True"` on the overlay window. |
 | Clipboard restore fails | `Clipboard.SetDataObject` with OLE objects is best-effort; catch and ignore. |
