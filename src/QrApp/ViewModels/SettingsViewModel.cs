@@ -85,8 +85,15 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
 
     public string EccLevel
     {
-        get => _working.Qr.EccLevel;
-        set { _working.Qr.EccLevel = value; OnPropertyChanged(); }
+        // Translate the stored letter ("Q") to/from the display string in the ComboBox
+        get => _working.Qr.EccLevel switch
+        {
+            "L" => "L — 7% recovery",
+            "M" => "M — 15% recovery",
+            "H" => "H — 30% recovery",
+            _   => "Q — 25% recovery (default)",
+        };
+        set { _working.Qr.EccLevel = value.Length > 0 ? value[0].ToString() : "Q"; OnPropertyChanged(); }
     }
 
     public IEnumerable<string> EccLevelOptions { get; } =
