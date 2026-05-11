@@ -25,6 +25,10 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 6 — Always commit and push without being asked**
+After completing any task or set of changes, always run `git add`, `git commit`, and `git push` autonomously.
+Never wait for the user to request it. If a PR doesn't exist yet, create one as a draft.
+
 **Lesson 5 — Windows target must be consistent everywhere**
 "Windows 11 target" was stated in NFRs while "Windows 10 1903+" appeared in Prerequisites and
 other tables. Contradictions in OS requirements cause wrong build configurations. Define the OS

@@ -11,7 +11,7 @@ public sealed partial class OverlayWindow : Window
 
     private bool _suppressDeactivate;
 
-    internal OverlayWindow(OverlayViewModel vm, OcrService ocrService, TextSanitizerService sanitizerService)
+    internal OverlayWindow(OverlayViewModel vm, OcrService ocrService, TextSanitizerService sanitizerService, bool showOcrButton = false)
     {
         _vm               = vm;
         _ocrService       = ocrService;
@@ -20,6 +20,8 @@ public sealed partial class OverlayWindow : Window
         vm.RequestClose = Hide;  // X button and Escape hide, not close
         DataContext = vm;
         InitializeComponent();
+
+        OcrButton.Visibility = showOcrButton ? Visibility.Visible : Visibility.Collapsed;
 
         // Keep placeholder in sync with text content
         vm.PropertyChanged += (_, e) =>
