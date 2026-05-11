@@ -1,0 +1,7 @@
+<Window x:Class="QrApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="QrApp" Height="0" Width="0"
+        WindowStyle="None" ShowInTaskbar="False"
+        Visibility="Hidden">
+</Window>

@@ -11,24 +11,24 @@
 
 ## Phase 1 — Project Setup
 
-- [ ] **Create solution and project scaffold**
+- [x] **Create solution and project scaffold**
   - `dotnet new sln -n QrApp`
   - `dotnet new wpf -n QrApp -o src/QrApp --framework net8.0-windows`
   - `dotnet sln add src/QrApp/QrApp.csproj`
   - Create folder tree: `Services/`, `ViewModels/`, `Helpers/`, `Assets/`
 
-- [ ] **Configure csproj**
+- [x] **Configure csproj**
   - TFM: `net8.0-windows10.0.22000.0`
   - `SupportedOSPlatformVersion`: `10.0.22000.0`
   - `SelfContained`, `RuntimeIdentifier=win-x64`, `PublishSingleFile`, `IncludeNativeLibrariesForSelfExtract`
   - Add NuGet: `QRCoder 1.6.0`, `System.Drawing.Common 8.0.0`, `Microsoft.Xaml.Behaviors.Wpf 1.1.77`
 
-- [ ] **Draw application icon** (`Assets/icon.ico`)
+- [x] **Draw application icon** (`Assets/icon.ico`)
   - 256×256 main size; also embed 64×64, 32×32, 16×16 in the ICO container
   - Design: simple QR code glyph, dark squares on transparent/white background
   - Tool: any vector editor (Inkscape, Figma) → export PNG → convert to ICO with ImageMagick or IcoFX
 
-- [ ] **Draw tray icon** (`Assets/tray-icon.ico`)
+- [x] **Draw tray icon** (`Assets/tray-icon.ico`)
   - Must be legible at 16×16 and 32×32
   - Design: minimal QR outline glyph; use system foreground color so it adapts to light/dark taskbar
   - Keep it simpler than the app icon — at 16 px, detail is invisible
@@ -37,20 +37,20 @@
 
 ## Phase 2 — Core Services
 
-- [ ] **`Helpers/NativeMethods.cs`**
+- [x] **`Helpers/NativeMethods.cs`**
   - P/Invoke: `RegisterHotKey`, `UnregisterHotKey`, `SendInput`, `GetCursorPos`, `MonitorFromPoint`, `GetMonitorInfo`
   - Structs: `POINT`, `RECT`, `MONITORINFO`, `KEYBDINPUT`, `INPUT`
   - Constants: `WM_HOTKEY`, `MOD_CONTROL`, `MOD_SHIFT`, `VK_C`, `INPUT_KEYBOARD`, `KEYEVENTF_KEYUP`, `MONITOR_DEFAULTTONEAREST`
   - Reference skeleton in `docs/DEVELOPMENT.md`
 
-- [ ] **`Services/HotkeyService.cs`**
+- [x] **`Services/HotkeyService.cs`**
   - `HwndSource` message-only window (`HWND_MESSAGE` parent)
   - `RegisterHotKey` / `UnregisterHotKey` with configurable modifiers + key
   - `WM_HOTKEY` → fire `HotkeyPressed` event
   - `IDisposable`: unregister on dispose
   - Verify: press hotkey in a running app, confirm event fires
 
-- [ ] **`Services/SettingsService.cs`**
+- [x] **`Services/SettingsService.cs`**
   - Load `%APPDATA%\QrApp\settings.json` → `AppSettings`
   - On any exception (missing/locked/malformed): reset to `AppSettings.Default`, overwrite file
   - `Save(AppSettings)`: create directory if needed, write indented JSON
@@ -58,20 +58,20 @@
   - Define `AppSettings` record with `Default` static property
   - Verify: delete the file → app resets; corrupt the file → app resets
 
-- [ ] **`Services/TextSanitizerService.cs`**
+- [x] **`Services/TextSanitizerService.cs`**
   - `SanitizerRule(string Match, string Replace, bool IsRegex)` record
   - Compile `Regex` instances at construction (not per-call)
   - `Sanitize(string)`: apply rules in order, then `Trim()`
   - Default rules (from `docs/ARCHITECTURE.md` Settings Schema section)
   - Verify: pass a string with BOM, CRLF, trailing spaces → confirm all stripped
 
-- [ ] **`Services/SelectionService.cs`**
+- [x] **`Services/SelectionService.cs`**
   - Save clipboard → clear → `SendInput` Ctrl+C → poll 300 ms → read → restore clipboard
   - Clipboard retry: up to 5× with 20 ms delay on `OpenClipboard` contention
   - Return `string.Empty` if nothing captured within budget
   - Verify: select text in Notepad → trigger → confirm correct text returned
 
-- [ ] **`Services/OcrService.cs`**
+- [x] **`Services/OcrService.cs`**
   - `OcrEngine` created once from user profile languages (fallback: `en`)
   - `RecognizeCursorRegionAsync()`: capture 600×400 region centred on cursor
   - `RecognizeRegionAsync(Rectangle)`: capture exact screen rect
@@ -79,7 +79,7 @@
   - Concatenate `result.Lines` with space separator
   - Verify manually: point cursor at text on screen → trigger → confirm recognisable output
 
-- [ ] **`Services/QrCodeService.cs`**
+- [x] **`Services/QrCodeService.cs`**
   - `QrSettings(int TargetSizePx = 300, ECCLevel EccLevel = ECCLevel.Q)` record
   - Derive `PixelsPerModule = Max(1, Ceiling(TargetSizePx / moduleCount))`
   - `moduleCount = data.ModuleMatrix.Count` (from `QRCodeData` after generation)
@@ -91,13 +91,13 @@
 
 ## Phase 3 — ViewModels
 
-- [ ] **`ViewModels/OverlayViewModel.cs`**
+- [x] **`ViewModels/OverlayViewModel.cs`**
   - `INotifyPropertyChanged` (or `ObservableObject`)
   - Properties: `QrImage` (`BitmapSource?`), `SourceText` (`string`), `StatusText` (`string`), `StatusLevel` (`enum: None/Warning/Error`)
   - 150 ms debounce on `SourceText` setter: cancel pending timer, restart; on fire → call `QrCodeService.Generate` → update `QrImage` and `StatusText`
   - `StatusLevel` drives status bar visibility and color in XAML via converter
 
-- [ ] **`ViewModels/SettingsViewModel.cs`**
+- [x] **`ViewModels/SettingsViewModel.cs`**
   - Load a deep copy of `AppSettings` on construction (working copy)
   - `ICommand Apply`: validate → `SettingsService.Save` → `HotkeyService` re-register → `SettingsService.ApplyAutostart`
   - `ICommand Cancel`: no-op (window closes without saving)
@@ -107,7 +107,7 @@
 
 ## Phase 4 — Windows / UI
 
-- [ ] **`RegionSelectorWindow.xaml` / `.cs`**
+- [x] **`RegionSelectorWindow.xaml` / `.cs`**
   - Fullscreen: `Left/Top/Width/Height` from `SystemParameters.VirtualScreen*`
   - `WindowStyle=None`, `AllowsTransparency=True`, `Topmost=True`
   - Background: `#66000000` (40% black overlay)
@@ -118,7 +118,7 @@
   - Instruction text centered at bottom: `"Draw a region to read text from. Esc to cancel."`
   - `SelectAsync()` static factory method
 
-- [ ] **`OverlayWindow.xaml` / `.cs`**
+- [x] **`OverlayWindow.xaml` / `.cs`**
   - `WindowStyle=None`, `AllowsTransparency=True`, acrylic/Mica backdrop
   - Header row (32 px): OCR Region button (left), Close `✕` button (right)
   - Content row: `TextBox` (50%) + QR `Image` (50%), both with 16 px padding
@@ -130,7 +130,7 @@
   - OCR button click: hide self → `RegionSelectorWindow.SelectAsync()` → if rect: OCR → sanitize → generate → update VM → show self; if null: just show self
   - `Esc` key binding → close
 
-- [ ] **`SettingsWindow.xaml` / `.cs`**
+- [x] **`SettingsWindow.xaml` / `.cs`**
   - Standard `Window`, fixed 480 px width, modal
   - Sections: Hotkey, QR Code (size slider + ECC dropdown), Overlay (auto-dismiss), Startup (autostart checkbox), Symbol Filter (rule list)
   - Hotkey field: click → recording mode (accent tint bg, placeholder text); `KeyDown` → capture; `Esc` → cancel recording
@@ -140,7 +140,7 @@
   - Footer: Cancel + Apply buttons (Apply is `IsDefault`)
   - Bind to `SettingsViewModel`
 
-- [ ] **`App.xaml.cs` — wire everything together**
+- [x] **`App.xaml.cs` — wire everything together**
   - `ShutdownMode = OnExplicitShutdown`
   - Instantiate all services; load settings; apply autostart
   - `NotifyIcon` with tray icon, tooltip, right-click menu (Settings, separator, Quit)
@@ -155,11 +155,11 @@
 
 ## Phase 5 — Build and Verify
 
-- [ ] **`dotnet build` with zero warnings**
+- [x] **`dotnet build` with zero warnings**
   - Treat nullable warnings as errors during review
   - Fix all `CS8600`–`CS8625` nullability issues before proceeding
 
-- [ ] **`dotnet publish` self-contained EXE**
+- [x] **`dotnet publish` self-contained EXE**
   ```
   dotnet publish src/QrApp -c Release -r win-x64 --self-contained true \
       -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \

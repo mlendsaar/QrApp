@@ -1,0 +1,23 @@
+<Window x:Class="QrApp.RegionSelectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#66000000"
+        Topmost="True"
+        Cursor="Cross"
+        ShowInTaskbar="False">
+    <Canvas x:Name="SelectionCanvas">
+        <Rectangle x:Name="SelectionRect"
+                   Stroke="White"
+                   StrokeThickness="2"
+                   Fill="#22FFFFFF"
+                   Visibility="Collapsed" />
+        <TextBlock x:Name="InstructionText"
+                   Text="Draw a region to read text from.  Esc to cancel."
+                   Foreground="White"
+                   FontSize="13"
+                   FontFamily="Segoe UI Variable"
+                   HorizontalAlignment="Center" />
+    </Canvas>
+</Window>
