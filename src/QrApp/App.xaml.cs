@@ -75,41 +75,35 @@ public sealed partial class App : System.Windows.Application
 
     private async void OnHotkeyPressed(object? sender, EventArgs e)
     {
-        // If overlay already open, close it and open a fresh one
         if (_overlay is not null)
         {
             _overlay.Close();
             _overlay = null;
         }
 
-        await RunCapturePipelineAsync(useOcrFallback: true);
+        await RunCapturePipelineAsync();
     }
 
     private async void OnMouseDoubleClicked(object? sender, EventArgs e)
     {
         if (!_settings.Capture.DoubleClickCapture) return;
-        if (_overlay is not null) return; // don't interrupt an open overlay
+        if (_overlay is not null) return;
 
-        // Hook fires on the UI thread; delay lets the browser finish selecting the double-clicked word
         await Task.Delay(120);
-        await RunCapturePipelineAsync(useOcrFallback: false);
+        await RunCapturePipelineAsync();
     }
 
-    private async Task RunCapturePipelineAsync(bool useOcrFallback)
+    private async Task RunCapturePipelineAsync()
     {
         string raw;
         try { raw = await _selectionService.GetSelectedTextAsync(); }
         catch { raw = string.Empty; }
 
-        if (string.IsNullOrWhiteSpace(raw) && useOcrFallback)
-            raw = await _ocrService.RecognizeCursorRegionAsync();
-
         var text = _sanitizerService.Sanitize(raw);
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            if (useOcrFallback)
-                _trayIcon.ShowBalloonTip(2000, "QrApp", "Nothing to encode.", ToolTipIcon.Info);
+            _trayIcon.ShowBalloonTip(2000, "QrApp", "Nothing to encode.", ToolTipIcon.Info);
             return;
         }
 
