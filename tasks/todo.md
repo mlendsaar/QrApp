@@ -91,13 +91,13 @@
 
 ## Phase 3 — ViewModels
 
-- [ ] **`ViewModels/OverlayViewModel.cs`**
+- [x] **`ViewModels/OverlayViewModel.cs`**
   - `INotifyPropertyChanged` (or `ObservableObject`)
   - Properties: `QrImage` (`BitmapSource?`), `SourceText` (`string`), `StatusText` (`string`), `StatusLevel` (`enum: None/Warning/Error`)
   - 150 ms debounce on `SourceText` setter: cancel pending timer, restart; on fire → call `QrCodeService.Generate` → update `QrImage` and `StatusText`
   - `StatusLevel` drives status bar visibility and color in XAML via converter
 
-- [ ] **`ViewModels/SettingsViewModel.cs`**
+- [x] **`ViewModels/SettingsViewModel.cs`**
   - Load a deep copy of `AppSettings` on construction (working copy)
   - `ICommand Apply`: validate → `SettingsService.Save` → `HotkeyService` re-register → `SettingsService.ApplyAutostart`
   - `ICommand Cancel`: no-op (window closes without saving)
