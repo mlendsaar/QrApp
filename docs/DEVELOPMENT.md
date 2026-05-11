@@ -68,21 +68,24 @@ Open `src/QrApp/QrApp.csproj` and configure it:
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <Optimize>true</Optimize>
-    <!-- Single-file publish support -->
-    <PublishSingleFile>true</PublishSingleFile>
+    <!-- Self-contained single-file: no .NET runtime required on target machine -->
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.19041.1" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
   </ItemGroup>
 </Project>
@@ -94,6 +97,7 @@ Open `src/QrApp/QrApp.csproj` and configure it:
 cd src/QrApp
 dotnet add package QRCoder --version 1.6.0
 dotnet add package System.Drawing.Common --version 8.0.0
+dotnet add package Microsoft.Windows.SDK.Contracts --version 10.0.19041.1
 dotnet add package Microsoft.Xaml.Behaviors.Wpf --version 1.1.77
 
 cd ../../tests/QrApp.Tests
@@ -115,12 +119,17 @@ Create the following empty files to match the planned structure:
 ```
 Services/HotkeyService.cs
 Services/SelectionService.cs
+Services/OcrService.cs
+Services/TextSanitizerService.cs
 Services/QrCodeService.cs
 Services/SettingsService.cs
 ViewModels/OverlayViewModel.cs
+ViewModels/SettingsViewModel.cs
 Helpers/NativeMethods.cs
 OverlayWindow.xaml
 OverlayWindow.xaml.cs
+SettingsWindow.xaml
+SettingsWindow.xaml.cs
 Assets/icon.ico          ← add a 256×256 icon here
 Assets/tray-icon.ico     ← 16×16 / 32×32 tray icon
 ```
@@ -134,11 +143,14 @@ Implement in this order to keep each step buildable and testable:
 1. **`NativeMethods.cs`** — P/Invoke stubs (`SendInput`, `RegisterHotKey`, `GetCursorPos`).
 2. **`HotkeyService.cs`** — Register a hotkey; log to debug output when pressed.
 3. **`SelectionService.cs`** — Clipboard capture logic; unit test with a mock clipboard.
-4. **`QrCodeService.cs`** — Generate QR from a hardcoded string; unit test output dimensions.
-5. **`OverlayViewModel.cs`** — Expose `QrImage` and `StatusText` with `INotifyPropertyChanged`.
-6. **`OverlayWindow.xaml`** — Borderless window, `Image` binding, buttons.
-7. **`App.xaml.cs`** — Wire everything together; add tray icon.
-8. **`SettingsService.cs`** — Load/save JSON; hook into App startup/shutdown.
+4. **`TextSanitizerService.cs`** — Strip/replace rules from config; unit test each default rule.
+5. **`QrCodeService.cs`** — Generate QR from a hardcoded string; derive `PixelsPerModule` from `TargetSizePx`; unit test output dimensions.
+6. **`OcrService.cs`** — `Windows.Media.Ocr` screenshot capture; integration test manually (requires a real screen).
+7. **`OverlayViewModel.cs`** — Expose `QrImage`, `SourceText`, `StatusText` with `INotifyPropertyChanged`; wire 150 ms debounce.
+8. **`OverlayWindow.xaml`** — Borderless window, editable `TextBox`, `Image` binding, buttons.
+9. **`SettingsService.cs`** — Load/save JSON; hook into App startup/shutdown.
+10. **`SettingsViewModel.cs`** + **`SettingsWindow.xaml`** — Working copy pattern; Apply/Cancel; press-to-record hotkey field; size slider; color pickers; rule list.
+11. **`App.xaml.cs`** — Wire everything together; tray icon; Settings → Quit menu.
 
 ---
 
@@ -336,7 +348,9 @@ Tests must not depend on a real screen or clipboard — mock `SelectionService` 
 
 ## Building for Release
 
-### Self-Contained Single-File EXE
+The app is **always published self-contained** — no .NET runtime required on the target machine. This is a hard project requirement.
+
+### Self-Contained Single-File EXE (standard release)
 
 ```bash
 dotnet publish src/QrApp -c Release -r win-x64 --self-contained true \
@@ -344,17 +358,7 @@ dotnet publish src/QrApp -c Release -r win-x64 --self-contained true \
     -o publish/
 ```
 
-Output: `publish/QrApp.exe` — ~60–80 MB, no runtime required on target machine.
-
-### Framework-Dependent EXE (smaller, requires .NET 8 runtime)
-
-```bash
-dotnet publish src/QrApp -c Release -r win-x64 --self-contained false \
-    -p:PublishSingleFile=true \
-    -o publish/
-```
-
-Output: ~5 MB.
+Output: `publish/QrApp.exe` — ~60–80 MB, runs on any Windows 10 1903+ or Windows 11 machine with no prerequisites.
 
 ### MSIX Package (recommended for distribution)
 
