@@ -21,7 +21,7 @@ dotnet build -c Debug
 dotnet run --project src/QrApp
 ```
 
-App appears in the system tray. Select any text and press `Ctrl+Shift+Q`.
+App appears in the system tray. Select any text and press `Ctrl+Shift+F2`.
 
 ---
 
