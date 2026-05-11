@@ -1,0 +1,30 @@
+<Window x:Class="QrApp.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="QrApp — Kasutusjuhend"
+        Width="700" Height="620"
+        MinWidth="480" MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+    <Window.InputBindings>
+        <KeyBinding Key="Escape" Command="{Binding CloseCommand}" />
+    </Window.InputBindings>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Title bar -->
+        <Border Grid.Row="0" Background="#F3F3F3" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+            <TextBlock Text="Kasutusjuhend"
+                       FontSize="20" FontWeight="SemiBold"
+                       FontFamily="Segoe UI Variable"
+                       VerticalAlignment="Center" Margin="16,0" />
+        </Border>
+
+        <WebBrowser x:Name="Browser" Grid.Row="1" />
+    </Grid>
+</Window>
