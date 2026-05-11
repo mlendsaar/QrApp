@@ -52,6 +52,18 @@ public sealed partial class OverlayWindow : Window
             Hide();
     }
 
+    private void Header_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        // Walk up from the click source; don't drag if a button was clicked
+        var src = e.OriginalSource as System.Windows.DependencyObject;
+        while (src is not null && !ReferenceEquals(src, sender))
+        {
+            if (src is System.Windows.Controls.Primitives.ButtonBase) return;
+            src = System.Windows.Media.VisualTreeHelper.GetParent(src);
+        }
+        DragMove();
+    }
+
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
 
     private void HelpButton_Click(object sender, RoutedEventArgs e)
