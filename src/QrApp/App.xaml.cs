@@ -93,7 +93,10 @@ public sealed partial class App : System.Windows.Application
             return;
         }
 
-        var vm = new OverlayViewModel(_qrService, _settings.Qr.ToQrSettings());
+        var vm = new OverlayViewModel(_qrService, _settings.Qr.ToQrSettings())
+        {
+            HotkeyLabel = _settings.Hotkey.ToLabel(),
+        };
         _overlay = new OverlayWindow(vm, _ocrService, _sanitizerService, _settings.Overlay.ShowOcrButton);
         _overlay.PositionNearCursor();
         _overlay.Closed += (_, _) => _overlay = null;

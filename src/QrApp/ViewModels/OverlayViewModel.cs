@@ -19,6 +19,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     private string _sourceText = string.Empty;
     private string _statusText = string.Empty;
     private StatusLevel _statusLevel = StatusLevel.None;
+    private string _hotkeyLabel = string.Empty;
 
     public OverlayViewModel(QrCodeService qrService, QrSettings qrSettings)
     {
@@ -33,6 +34,12 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
 
     public ICommand CloseCommand { get; }
     public Action? RequestClose { get; set; }
+
+    public string HotkeyLabel
+    {
+        get => _hotkeyLabel;
+        set { _hotkeyLabel = value; OnPropertyChanged(); }
+    }
 
     public BitmapSource? QrImage
     {
