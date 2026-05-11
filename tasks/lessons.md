@@ -25,6 +25,12 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 8 — Don't auto-fallback to OCR; trust the user's selection**
+The original hotkey pipeline fell back to OcrService.RecognizeCursorRegionAsync() when the
+clipboard was empty. This captured a large 600×400 region which is never what the user wanted.
+Rule: the hotkey (and double-click) should only use what the user has explicitly selected.
+OCR is only available as a manual action via the overlay button.
+
 **Lesson 7 — Clipboard.Clear() / all clipboard calls can throw CLIPBRD_E_CANT_OPEN**
 `Clipboard.Clear()` (and all WPF Clipboard methods) throw `COMException 0x800401D0` when another
 process holds the clipboard open. The existing retry only covered the poll loop; wrap every
