@@ -138,10 +138,11 @@
                               SelectedItem="{Binding EccLevel}"
                               FontSize="14"
                               AutomationProperties.Name="Error correction level" />
-                    <TextBlock Grid.Column="2" Text="ⓘ" FontSize="16" VerticalAlignment="Center"
-                               Margin="8,0,0,0">
-                        <TextBlock.ToolTip>Higher recovery = smaller data capacity. Q is a good default.</TextBlock.ToolTip>
-                    </TextBlock>
+                    <Button Grid.Column="2" Content="ⓘ" FontSize="16" VerticalAlignment="Center"
+                            Margin="8,0,0,0" Click="EccInfoButton_Click"
+                            Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"
+                            ToolTip="Higher recovery = smaller data capacity. Q is a good default."
+                            AutomationProperties.Name="Open user manual" />
                 </Grid>
 
                 <!-- Overlay -->
@@ -167,6 +168,18 @@
                           Margin="0,8,0,0"
                           Style="{StaticResource ToggleSwitch}"
                           AutomationProperties.Name="Show OCR Region button" />
+
+                <!-- OCR -->
+                <TextBlock Text="OCR" Style="{StaticResource SectionHeader}" />
+                <CheckBox Content="Upscale image before recognition (improves accuracy on small text)"
+                          IsChecked="{Binding OcrUpscaleEnabled}"
+                          Margin="0,0,0,8"
+                          Style="{StaticResource ToggleSwitch}"
+                          AutomationProperties.Name="Upscale image for OCR" />
+                <CheckBox Content="Preserve line breaks in recognised text"
+                          IsChecked="{Binding OcrPreserveLines}"
+                          Style="{StaticResource ToggleSwitch}"
+                          AutomationProperties.Name="Preserve line breaks in OCR output" />
 
                 <!-- Startup -->
                 <TextBlock Text="Startup" Style="{StaticResource SectionHeader}" />

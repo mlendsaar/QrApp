@@ -132,6 +132,20 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
         set { _working.Overlay.ShowOcrButton = value; OnPropertyChanged(); }
     }
 
+    // ── OCR ──────────────────────────────────────────────────────────────────
+
+    public bool OcrUpscaleEnabled
+    {
+        get => _working.Ocr.UpscaleEnabled;
+        set { _working.Ocr.UpscaleEnabled = value; OnPropertyChanged(); }
+    }
+
+    public bool OcrPreserveLines
+    {
+        get => _working.Ocr.PreserveLines;
+        set { _working.Ocr.PreserveLines = value; OnPropertyChanged(); }
+    }
+
     // ── Symbol Filter ────────────────────────────────────────────────────────
 
     public ObservableCollection<SanitizerRuleViewModel> Rules { get; }
@@ -188,6 +202,7 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
         Hotkey    = new HotkeyConfig { Modifiers = src.Hotkey.Modifiers, Key = src.Hotkey.Key },
         Qr        = new QrCodeConfig { TargetSizePx = src.Qr.TargetSizePx, EccLevel = src.Qr.EccLevel },
         Overlay   = new OverlayConfig { AutoDismissSeconds = src.Overlay.AutoDismissSeconds, ShowOcrButton = src.Overlay.ShowOcrButton },
+        Ocr       = new OcrConfig { UpscaleEnabled = src.Ocr.UpscaleEnabled, PreserveLines = src.Ocr.PreserveLines },
         Autostart = src.Autostart,
         Sanitizer = new SanitizerConfig { Rules = src.Sanitizer.Rules.Select(r => r with { }).ToList() },
     };

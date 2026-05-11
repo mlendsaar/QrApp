@@ -168,7 +168,7 @@
   - Confirm output is a single `.exe`, ~60–80 MB
 
 - [ ] **Manual smoke tests**
-  - Select text in Notepad → `Ctrl+Shift+Q` → overlay shows with correct text and scannable QR
+  - Select text in Notepad → `Ctrl+Shift+F2` → overlay shows with correct text and scannable QR
   - Select text in Chrome → hotkey → overlay shows
   - Hotkey while overlay is open → overlay closes and reopens with fresh capture
   - OCR button → draw region over text on screen → text appears in overlay

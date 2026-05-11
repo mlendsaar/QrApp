@@ -304,7 +304,7 @@ internal sealed class SettingsService
 
 ```json
 {
-  "hotkey": { "modifiers": "Ctrl+Shift", "key": "Q" },
+  "hotkey": { "modifiers": "Control,Shift", "key": "F2" },
   "qr": {
     "targetSizePx": 300,
     "eccLevel": "Q"

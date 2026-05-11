@@ -76,6 +76,12 @@ public sealed partial class SettingsWindow : Window
         e.Handled = true;
     }
 
+    private void EccInfoButton_Click(object sender, RoutedEventArgs e)
+    {
+        var help = new HelpWindow { Owner = this };
+        help.Show();
+    }
+
     private void DeleteRule_Click(object sender, RoutedEventArgs e)
     {
         if (sender is System.Windows.Controls.Button { Tag: SanitizerRuleViewModel rule })

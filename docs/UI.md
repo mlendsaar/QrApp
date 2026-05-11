@@ -158,7 +158,7 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 │                                                  │
 │  Hotkey                                          │
 │  ┌──────────────────────────────────────────┐   │
-│  │  Ctrl + Shift + Q          [Click to set] │   │
+│  │  Ctrl + Shift + F2         [Click to set] │   │
 │  └──────────────────────────────────────────┘   │
 │                                                  │
 │  QR Code                                         │
@@ -193,7 +193,7 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 
 ### Hotkey Field
 
-- Shows current hotkey as text: `Ctrl + Shift + Q`
+- Shows current hotkey as text: `Ctrl + Shift + F2`
 - Click → recording mode: accent tint background, text `"Press a key combination…"`
 - `KeyDown`: capture modifiers + key, display immediately, exit recording mode
 - Conflict: inline error `"This hotkey is in use by another application"`

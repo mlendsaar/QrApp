@@ -11,11 +11,14 @@ public sealed partial class OverlayWindow : Window
 
     private bool _suppressDeactivate;
 
-    internal OverlayWindow(OverlayViewModel vm, OcrService ocrService, TextSanitizerService sanitizerService, bool showOcrButton = false)
+    private readonly OcrConfig _ocrConfig;
+
+    internal OverlayWindow(OverlayViewModel vm, OcrService ocrService, TextSanitizerService sanitizerService, bool showOcrButton = false, OcrConfig? ocrConfig = null)
     {
         _vm               = vm;
         _ocrService       = ocrService;
         _sanitizerService = sanitizerService;
+        _ocrConfig        = ocrConfig ?? new OcrConfig();
 
         vm.RequestClose = Hide;  // X button and Escape hide, not close
         DataContext = vm;
@@ -76,7 +79,7 @@ public sealed partial class OverlayWindow : Window
 
         if (rect.HasValue)
         {
-            var raw       = await _ocrService.RecognizeRegionAsync(rect.Value);
+            var raw       = await _ocrService.RecognizeRegionAsync(rect.Value, _ocrConfig);
             var sanitized = _sanitizerService.Sanitize(raw);
             _vm.SourceText = sanitized;
         }

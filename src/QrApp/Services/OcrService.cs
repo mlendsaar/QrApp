@@ -1,3 +1,4 @@
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Globalization;
@@ -12,23 +13,41 @@ internal sealed class OcrService
         OcrEngine.TryCreateFromUserProfileLanguages() ??
         OcrEngine.TryCreateFromLanguage(new Language("en"))!;
 
-    public async Task<string> RecognizeCursorRegionAsync()
-    {
-        NativeMethods.GetCursorPos(out var pt);
-        var region = new System.Drawing.Rectangle(pt.X - 300, pt.Y - 200, 600, 400);
-        return await RecognizeRegionAsync(region);
-    }
-
-    public async Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect)
+    public async Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect, OcrConfig? config = null)
     {
         using var bmp = new System.Drawing.Bitmap(screenRect.Width, screenRect.Height);
         using (var g = System.Drawing.Graphics.FromImage(bmp))
             g.CopyFromScreen(screenRect.Location, System.Drawing.Point.Empty, screenRect.Size);
 
-        return await RecognizeBitmapAsync(bmp);
+        var toRecognize = (config?.UpscaleEnabled ?? true) ? Upscale(bmp) : bmp;
+        try
+        {
+            return await RecognizeBitmapAsync(toRecognize, config?.PreserveLines ?? true);
+        }
+        finally
+        {
+            if (!ReferenceEquals(toRecognize, bmp))
+                toRecognize.Dispose();
+        }
     }
 
-    private async Task<string> RecognizeBitmapAsync(System.Drawing.Bitmap bmp)
+    private static System.Drawing.Bitmap Upscale(System.Drawing.Bitmap bmp)
+    {
+        int maxDim = Math.Max(bmp.Width, bmp.Height);
+        if (maxDim == 0) return bmp;
+
+        // Windows OCR max dimension is 5000 px; clamp scale so we stay under 4800
+        int scale = Math.Min(3, 4800 / maxDim);
+        if (scale <= 1) return bmp;
+
+        var scaled = new System.Drawing.Bitmap(bmp.Width * scale, bmp.Height * scale);
+        using var g = System.Drawing.Graphics.FromImage(scaled);
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.DrawImage(bmp, 0, 0, scaled.Width, scaled.Height);
+        return scaled;
+    }
+
+    private async Task<string> RecognizeBitmapAsync(System.Drawing.Bitmap bmp, bool preserveLines)
     {
         using var ms = new MemoryStream();
         bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
@@ -37,6 +56,7 @@ internal sealed class OcrService
         var decoder = await BitmapDecoder.CreateAsync(ms.AsRandomAccessStream());
         var soft    = await decoder.GetSoftwareBitmapAsync();
         var result  = await _engine.RecognizeAsync(soft);
-        return string.Join(" ", result.Lines.Select(l => l.Text));
+        var sep     = preserveLines ? "\n" : " ";
+        return string.Join(sep, result.Lines.Select(l => l.Text));
     }
 }
