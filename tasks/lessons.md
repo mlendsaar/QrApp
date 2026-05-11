@@ -25,6 +25,13 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 13 — Hotkey recording: capture keys at Window level, not TextBox level**
+Setting e.Handled = true in PreviewMouseLeftButtonDown prevented the TextBox from
+receiving keyboard focus, so PreviewKeyDown on the TextBox never fired. Fix: override
+OnPreviewKeyDown on the Window itself — key events arrive regardless of which control
+has focus. The TextBox only needs to show visual state (background tint); the Window
+handles all keystroke logic.
+
 **Lesson 12 — SendInput Ctrl+C on hotkey is fragile; just read the clipboard**
 Synthesising Ctrl+C via SendInput has too many failure modes: modifier keys left held from
 the hotkey combo contaminate the injected keystrokes, different apps handle Ctrl+C differently,

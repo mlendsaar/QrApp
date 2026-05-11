@@ -87,8 +87,7 @@
                                  FontSize="14"
                                  FontFamily="Segoe UI Variable"
                                  AutomationProperties.Name="Hotkey"
-                                 PreviewMouseLeftButtonDown="HotkeyBox_MouseDown"
-                                 PreviewKeyDown="HotkeyBox_KeyDown" />
+                                 PreviewMouseLeftButtonDown="HotkeyBox_MouseDown" />
                         <TextBlock Text="{Binding HotkeyConflictMessage}"
                                    Visibility="{Binding HotkeyConflictMessage, Converter={StaticResource BoolToVis}}"
                                    Foreground="#C42B1C"
