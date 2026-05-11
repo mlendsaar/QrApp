@@ -25,6 +25,11 @@ Removing Copy/Save buttons from the feature list did not remove them from `ARCHI
 `OverlayWindow` component description. Checklist: after removing a feature, grep all docs for
 its name before committing.
 
+**Lesson 11 — Ctrl+Shift+Q conflicts with Firefox (close all tabs)**
+Ctrl+Shift+Q is claimed by Firefox as "close all tabs". RegisterHotKey may silently fail
+or the browser intercepts the key before our hook. Use F-key combinations as default
+hotkey — Ctrl+Shift+F2 is safe across all common browsers and Windows itself.
+
 **Lesson 10 — Hotkey modifiers contaminate the SendInput Ctrl+C**
 When the hotkey fires (e.g. Ctrl+Shift+Q), the modifier keys are still physically held.
 SendInput then produces Ctrl+Shift+C instead of Ctrl+C — in Chrome this opens DevTools,

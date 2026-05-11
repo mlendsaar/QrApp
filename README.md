@@ -11,7 +11,7 @@ If the text can't be selected normally (e.g. inside an image or a locked PDF), e
 ## How It Works
 
 1. Select any text with the mouse.
-2. Press the global hotkey (`Ctrl+Shift+Q` by default).
+2. Press the global hotkey (`Ctrl+Shift+F2` by default).
 3. QrApp captures the selection via clipboard, sanitizes it, generates the QR code, and opens the overlay.
 4. Edit the text in the overlay if needed — the QR updates live.
 5. Press `Esc` or click away to close. Pressing the hotkey while the overlay is already open closes it and opens a fresh one.
@@ -143,7 +143,7 @@ dotnet restore
 dotnet run --project src/QrApp
 ```
 
-Press `Ctrl+Shift+Q` with any text selected to see the overlay.
+Press `Ctrl+Shift+F2` with any text selected to see the overlay.
 
 ## Documentation
 

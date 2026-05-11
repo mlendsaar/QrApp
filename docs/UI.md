@@ -242,7 +242,7 @@ Toggle switches use a custom `CheckBox` template styled as a Windows 11-style pi
 
 - 16×16 px + 32×32 px for high-DPI
 - QR code glyph in system foreground color (adapts to light/dark taskbar)
-- Tooltip: `"QrApp — Ctrl+Shift+Q to capture"`
+- Tooltip: `"QrApp — Ctrl+Shift+F2 to capture"`
 - Right-click only:
   ```
   Settings

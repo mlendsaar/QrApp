@@ -49,7 +49,7 @@ public sealed partial class App : System.Windows.Application
         _trayIcon = new NotifyIcon
         {
             Icon             = icon,
-            Text             = "QrApp — Ctrl+Shift+Q to capture",
+            Text             = "QrApp — Ctrl+Shift+F2 to capture",
             Visible          = true,
             ContextMenuStrip = menu,
         };
