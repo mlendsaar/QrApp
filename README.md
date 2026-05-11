@@ -66,6 +66,10 @@ QrApp/
 │   ├── ARCHITECTURE.md
 │   ├── DEVELOPMENT.md
 │   └── UI.md
+├── tasks/
+│   ├── todo.md
+│   └── lessons.md
+├── CLAUDE.md
 ├── .gitignore
 └── QrApp.sln
 ```
@@ -144,6 +148,3 @@ Press `Ctrl+Shift+Q` with any text selected to see the overlay.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — build, publish, code skeletons, implementation order
 - [docs/UI.md](docs/UI.md) — layout, color palette, typography, interaction design
 
-## License
-
-MIT

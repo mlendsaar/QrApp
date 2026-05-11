@@ -33,9 +33,6 @@ App appears in the system tray. Select any text and press `Ctrl+Shift+Q`.
 dotnet new sln -n QrApp
 dotnet new wpf -n QrApp -o src/QrApp --framework net8.0-windows
 dotnet sln add src/QrApp/QrApp.csproj
-dotnet new xunit -n QrApp.Tests -o tests/QrApp.Tests --framework net8.0-windows
-dotnet sln add tests/QrApp.Tests/QrApp.Tests.csproj
-dotnet add tests/QrApp.Tests/QrApp.Tests.csproj reference src/QrApp/QrApp.csproj
 ```
 
 ### 2. Configure the .csproj
@@ -76,12 +73,6 @@ cd src/QrApp
 dotnet add package QRCoder --version 1.6.0
 dotnet add package System.Drawing.Common --version 8.0.0
 dotnet add package Microsoft.Xaml.Behaviors.Wpf --version 1.1.77
-
-cd ../../tests/QrApp.Tests
-dotnet add package Microsoft.NET.Test.Sdk
-dotnet add package xunit
-dotnet add package xunit.runner.visualstudio
-dotnet add package Moq
 ```
 
 ### 4. Create the Folder Structure
@@ -106,8 +97,8 @@ Helpers/NativeMethods.cs
 OverlayWindow.xaml / .cs
 RegionSelectorWindow.xaml / .cs
 SettingsWindow.xaml / .cs
-Assets/icon.ico            ← 256×256
-Assets/tray-icon.ico       ← 16×16 and 32×32
+Assets/icon.ico            ← 256×256 (drawn; see tasks/todo.md Phase 1)
+Assets/tray-icon.ico       ← 16×16 and 32×32 (drawn; see tasks/todo.md Phase 1)
 ```
 
 ---
@@ -118,11 +109,11 @@ Build in this sequence — each step is independently runnable:
 
 1. **`NativeMethods.cs`** — P/Invoke signatures only; no logic.
 2. **`HotkeyService.cs`** — Register hotkey; verify `WM_HOTKEY` fires in debug output.
-3. **`SettingsService.cs`** — Load/save JSON; test with a missing and a malformed file.
-4. **`TextSanitizerService.cs`** — Rule engine; unit test each default rule.
-5. **`SelectionService.cs`** — Clipboard capture; unit test with mock clipboard.
-6. **`OcrService.cs`** — Both modes (cursor region + explicit rect); test manually against a screenshot.
-7. **`QrCodeService.cs`** — Generate QR from hardcoded string; unit test bitmap dimensions.
+3. **`SettingsService.cs`** — Load/save JSON; verify corruption handling manually.
+4. **`TextSanitizerService.cs`** — Rule engine with default rules; verify manually.
+5. **`SelectionService.cs`** — Clipboard capture via `SendInput`.
+6. **`OcrService.cs`** — Both modes (cursor region + explicit rect); verify manually against on-screen text.
+7. **`QrCodeService.cs`** — Generate QR; derive `PixelsPerModule` from `TargetSizePx`; verify output is scannable.
 8. **`OverlayViewModel.cs`** — `QrImage`, `SourceText`, `StatusText`; wire 150 ms debounce.
 9. **`RegionSelectorWindow.xaml`** — Fullscreen transparent canvas, mouse selection, returns `Rectangle?`.
 10. **`OverlayWindow.xaml`** — TextBox, QR image, OCR button, status bar; wire to ViewModel.
@@ -419,16 +410,6 @@ internal sealed partial class RegionSelectorWindow : Window
     }
 }
 ```
-
----
-
-## Running Tests
-
-```bash
-dotnet test tests/QrApp.Tests --logger "console;verbosity=normal"
-```
-
-Services that depend on real clipboard, screen, or WinRT (`SelectionService`, `OcrService`) must be abstracted behind interfaces and mocked in tests.
 
 ---
 
