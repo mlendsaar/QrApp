@@ -52,7 +52,12 @@ public sealed partial class OverlayWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
 
     private void HelpButton_Click(object sender, RoutedEventArgs e)
-        => HelpPopup.IsOpen = !HelpPopup.IsOpen;
+    {
+        _suppressDeactivate = true;
+        var help = new HelpWindow { Owner = this };
+        help.Closed += (_, _) => _suppressDeactivate = false;
+        help.Show();
+    }
 
     private async void OcrButton_Click(object sender, RoutedEventArgs e)
     {
