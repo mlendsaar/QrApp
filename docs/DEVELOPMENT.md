@@ -119,12 +119,17 @@ Create the following empty files to match the planned structure:
 ```
 Services/HotkeyService.cs
 Services/SelectionService.cs
+Services/OcrService.cs
+Services/TextSanitizerService.cs
 Services/QrCodeService.cs
 Services/SettingsService.cs
 ViewModels/OverlayViewModel.cs
+ViewModels/SettingsViewModel.cs
 Helpers/NativeMethods.cs
 OverlayWindow.xaml
 OverlayWindow.xaml.cs
+SettingsWindow.xaml
+SettingsWindow.xaml.cs
 Assets/icon.ico          ← add a 256×256 icon here
 Assets/tray-icon.ico     ← 16×16 / 32×32 tray icon
 ```
@@ -138,11 +143,14 @@ Implement in this order to keep each step buildable and testable:
 1. **`NativeMethods.cs`** — P/Invoke stubs (`SendInput`, `RegisterHotKey`, `GetCursorPos`).
 2. **`HotkeyService.cs`** — Register a hotkey; log to debug output when pressed.
 3. **`SelectionService.cs`** — Clipboard capture logic; unit test with a mock clipboard.
-4. **`QrCodeService.cs`** — Generate QR from a hardcoded string; unit test output dimensions.
-5. **`OverlayViewModel.cs`** — Expose `QrImage` and `StatusText` with `INotifyPropertyChanged`.
-6. **`OverlayWindow.xaml`** — Borderless window, `Image` binding, buttons.
-7. **`App.xaml.cs`** — Wire everything together; add tray icon.
-8. **`SettingsService.cs`** — Load/save JSON; hook into App startup/shutdown.
+4. **`TextSanitizerService.cs`** — Strip/replace rules from config; unit test each default rule.
+5. **`QrCodeService.cs`** — Generate QR from a hardcoded string; derive `PixelsPerModule` from `TargetSizePx`; unit test output dimensions.
+6. **`OcrService.cs`** — `Windows.Media.Ocr` screenshot capture; integration test manually (requires a real screen).
+7. **`OverlayViewModel.cs`** — Expose `QrImage`, `SourceText`, `StatusText` with `INotifyPropertyChanged`; wire 150 ms debounce.
+8. **`OverlayWindow.xaml`** — Borderless window, editable `TextBox`, `Image` binding, buttons.
+9. **`SettingsService.cs`** — Load/save JSON; hook into App startup/shutdown.
+10. **`SettingsViewModel.cs`** + **`SettingsWindow.xaml`** — Working copy pattern; Apply/Cancel; press-to-record hotkey field; size slider; color pickers; rule list.
+11. **`App.xaml.cs`** — Wire everything together; tray icon; Settings → Quit menu.
 
 ---
 
