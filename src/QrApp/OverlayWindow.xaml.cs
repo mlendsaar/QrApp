@@ -75,7 +75,7 @@ public sealed partial class OverlayWindow : Window
         SourceTextBox.Focus();
     }
 
-    // Positions the window 16 px to the right of the cursor, clamped to monitor work area
+    // Centers the window on the monitor that contains the cursor
     public void PositionNearCursor()
     {
         NativeMethods.GetCursorPos(out var pt);
@@ -84,19 +84,12 @@ public sealed partial class OverlayWindow : Window
         var info = new NativeMethods.MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MONITORINFO>() };
         NativeMethods.GetMonitorInfo(monitorHandle, ref info);
 
-        double workLeft   = info.rcWork.Left;
-        double workTop    = info.rcWork.Top;
-        double workRight  = info.rcWork.Right;
-        double workBottom = info.rcWork.Bottom;
+        double workLeft  = info.rcWork.Left;
+        double workTop   = info.rcWork.Top;
+        double workWidth = info.rcWork.Right  - info.rcWork.Left;
+        double workHeight= info.rcWork.Bottom - info.rcWork.Top;
 
-        double desiredLeft = pt.X + 16;
-        double desiredTop  = pt.Y;
-
-        // Flip left if not enough room on the right
-        if (desiredLeft + Width > workRight)
-            desiredLeft = pt.X - Width - 16;
-
-        Left = Math.Max(workLeft,  Math.Min(desiredLeft, workRight  - Width));
-        Top  = Math.Max(workTop,   Math.Min(desiredTop,  workBottom - Height));
+        Left = workLeft + (workWidth  - Width)  / 2;
+        Top  = workTop  + (workHeight - Height) / 2;
     }
 }
