@@ -17,7 +17,7 @@ public sealed partial class OverlayWindow : Window
         _ocrService       = ocrService;
         _sanitizerService = sanitizerService;
 
-        vm.RequestClose = Close;
+        vm.RequestClose = Hide;  // X button and Escape hide, not close
         DataContext = vm;
         InitializeComponent();
 
@@ -42,11 +42,12 @@ public sealed partial class OverlayWindow : Window
     protected override void OnDeactivated(EventArgs e)
     {
         base.OnDeactivated(e);
-        if (!_suppressDeactivate)
-            Close();
+        // Guard: don't act if already hidden or mid-close (avoids re-entrancy crash)
+        if (!_suppressDeactivate && IsVisible)
+            Hide();
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
 
     private async void OcrButton_Click(object sender, RoutedEventArgs e)
     {
