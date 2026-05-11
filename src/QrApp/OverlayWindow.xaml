@@ -45,7 +45,8 @@
                     <BlurEffect Radius="0" />
                 </Grid.Effect>
 
-                <Button Grid.Column="0"
+                <Button x:Name="OcrButton"
+                        Grid.Column="0"
                         Content="⬡ OCR Region"
                         Click="OcrButton_Click"
                         HorizontalAlignment="Left"

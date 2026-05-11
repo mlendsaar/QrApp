@@ -13,6 +13,7 @@ public sealed partial class App : System.Windows.Application
     private readonly OcrService           _ocrService       = new();
     private readonly QrCodeService        _qrService        = new();
 
+    private MouseHookService     _mouseHookService = null!;
     private TextSanitizerService _sanitizerService = null!;
     private AppSettings          _settings         = null!;
     private NotifyIcon           _trayIcon         = null!;
@@ -29,6 +30,10 @@ public sealed partial class App : System.Windows.Application
         _settingsService.ApplyAutostart(_settings.Autostart);
         InitTray();
         RegisterHotkey();
+
+        // Install after the message loop is running (OnStartup is called from within Run)
+        _mouseHookService = new MouseHookService();
+        _mouseHookService.DoubleClicked += OnMouseDoubleClicked;
     }
 
     private void InitTray()
@@ -77,22 +82,37 @@ public sealed partial class App : System.Windows.Application
             _overlay = null;
         }
 
-        // Capture pipeline
+        await RunCapturePipelineAsync(useOcrFallback: true);
+    }
+
+    private async void OnMouseDoubleClicked(object? sender, EventArgs e)
+    {
+        if (!_settings.Capture.DoubleClickCapture) return;
+        if (_overlay is not null) return; // don't interrupt an open overlay
+
+        // Hook fires on the UI thread; delay lets the browser finish selecting the double-clicked word
+        await Task.Delay(120);
+        await RunCapturePipelineAsync(useOcrFallback: false);
+    }
+
+    private async Task RunCapturePipelineAsync(bool useOcrFallback)
+    {
         var raw = await _selectionService.GetSelectedTextAsync();
 
-        if (string.IsNullOrWhiteSpace(raw))
+        if (string.IsNullOrWhiteSpace(raw) && useOcrFallback)
             raw = await _ocrService.RecognizeCursorRegionAsync();
 
         var text = _sanitizerService.Sanitize(raw);
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            _trayIcon.ShowBalloonTip(2000, "QrApp", "Nothing to encode.", ToolTipIcon.Info);
+            if (useOcrFallback)
+                _trayIcon.ShowBalloonTip(2000, "QrApp", "Nothing to encode.", ToolTipIcon.Info);
             return;
         }
 
         var vm = new OverlayViewModel(_qrService, _settings.Qr.ToQrSettings());
-        _overlay = new OverlayWindow(vm, _ocrService, _sanitizerService);
+        _overlay = new OverlayWindow(vm, _ocrService, _sanitizerService, _settings.Overlay.ShowOcrButton);
         _overlay.PositionNearCursor();
         _overlay.Closed += (_, _) => _overlay = null;
         _overlay.SetInitialText(text);
@@ -115,6 +135,7 @@ public sealed partial class App : System.Windows.Application
     {
         _overlay?.Close();
         _hotkeyService.Dispose();
+        _mouseHookService.Dispose();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
         Shutdown();
@@ -123,6 +144,7 @@ public sealed partial class App : System.Windows.Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeyService.Dispose();
+        _mouseHookService.Dispose();
         _trayIcon?.Dispose();
         base.OnExit(e);
     }
