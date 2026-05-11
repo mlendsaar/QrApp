@@ -11,24 +11,24 @@
 
 ## Phase 1 — Project Setup
 
-- [ ] **Create solution and project scaffold**
+- [x] **Create solution and project scaffold**
   - `dotnet new sln -n QrApp`
   - `dotnet new wpf -n QrApp -o src/QrApp --framework net8.0-windows`
   - `dotnet sln add src/QrApp/QrApp.csproj`
   - Create folder tree: `Services/`, `ViewModels/`, `Helpers/`, `Assets/`
 
-- [ ] **Configure csproj**
+- [x] **Configure csproj**
   - TFM: `net8.0-windows10.0.22000.0`
   - `SupportedOSPlatformVersion`: `10.0.22000.0`
   - `SelfContained`, `RuntimeIdentifier=win-x64`, `PublishSingleFile`, `IncludeNativeLibrariesForSelfExtract`
   - Add NuGet: `QRCoder 1.6.0`, `System.Drawing.Common 8.0.0`, `Microsoft.Xaml.Behaviors.Wpf 1.1.77`
 
-- [ ] **Draw application icon** (`Assets/icon.ico`)
+- [x] **Draw application icon** (`Assets/icon.ico`)
   - 256×256 main size; also embed 64×64, 32×32, 16×16 in the ICO container
   - Design: simple QR code glyph, dark squares on transparent/white background
   - Tool: any vector editor (Inkscape, Figma) → export PNG → convert to ICO with ImageMagick or IcoFX
 
-- [ ] **Draw tray icon** (`Assets/tray-icon.ico`)
+- [x] **Draw tray icon** (`Assets/tray-icon.ico`)
   - Must be legible at 16×16 and 32×32
   - Design: minimal QR outline glyph; use system foreground color so it adapts to light/dark taskbar
   - Keep it simpler than the app icon — at 16 px, detail is invisible
