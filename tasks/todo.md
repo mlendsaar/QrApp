@@ -37,20 +37,20 @@
 
 ## Phase 2 — Core Services
 
-- [ ] **`Helpers/NativeMethods.cs`**
+- [x] **`Helpers/NativeMethods.cs`**
   - P/Invoke: `RegisterHotKey`, `UnregisterHotKey`, `SendInput`, `GetCursorPos`, `MonitorFromPoint`, `GetMonitorInfo`
   - Structs: `POINT`, `RECT`, `MONITORINFO`, `KEYBDINPUT`, `INPUT`
   - Constants: `WM_HOTKEY`, `MOD_CONTROL`, `MOD_SHIFT`, `VK_C`, `INPUT_KEYBOARD`, `KEYEVENTF_KEYUP`, `MONITOR_DEFAULTTONEAREST`
   - Reference skeleton in `docs/DEVELOPMENT.md`
 
-- [ ] **`Services/HotkeyService.cs`**
+- [x] **`Services/HotkeyService.cs`**
   - `HwndSource` message-only window (`HWND_MESSAGE` parent)
   - `RegisterHotKey` / `UnregisterHotKey` with configurable modifiers + key
   - `WM_HOTKEY` → fire `HotkeyPressed` event
   - `IDisposable`: unregister on dispose
   - Verify: press hotkey in a running app, confirm event fires
 
-- [ ] **`Services/SettingsService.cs`**
+- [x] **`Services/SettingsService.cs`**
   - Load `%APPDATA%\QrApp\settings.json` → `AppSettings`
   - On any exception (missing/locked/malformed): reset to `AppSettings.Default`, overwrite file
   - `Save(AppSettings)`: create directory if needed, write indented JSON
@@ -58,20 +58,20 @@
   - Define `AppSettings` record with `Default` static property
   - Verify: delete the file → app resets; corrupt the file → app resets
 
-- [ ] **`Services/TextSanitizerService.cs`**
+- [x] **`Services/TextSanitizerService.cs`**
   - `SanitizerRule(string Match, string Replace, bool IsRegex)` record
   - Compile `Regex` instances at construction (not per-call)
   - `Sanitize(string)`: apply rules in order, then `Trim()`
   - Default rules (from `docs/ARCHITECTURE.md` Settings Schema section)
   - Verify: pass a string with BOM, CRLF, trailing spaces → confirm all stripped
 
-- [ ] **`Services/SelectionService.cs`**
+- [x] **`Services/SelectionService.cs`**
   - Save clipboard → clear → `SendInput` Ctrl+C → poll 300 ms → read → restore clipboard
   - Clipboard retry: up to 5× with 20 ms delay on `OpenClipboard` contention
   - Return `string.Empty` if nothing captured within budget
   - Verify: select text in Notepad → trigger → confirm correct text returned
 
-- [ ] **`Services/OcrService.cs`**
+- [x] **`Services/OcrService.cs`**
   - `OcrEngine` created once from user profile languages (fallback: `en`)
   - `RecognizeCursorRegionAsync()`: capture 600×400 region centred on cursor
   - `RecognizeRegionAsync(Rectangle)`: capture exact screen rect
@@ -79,7 +79,7 @@
   - Concatenate `result.Lines` with space separator
   - Verify manually: point cursor at text on screen → trigger → confirm recognisable output
 
-- [ ] **`Services/QrCodeService.cs`**
+- [x] **`Services/QrCodeService.cs`**
   - `QrSettings(int TargetSizePx = 300, ECCLevel EccLevel = ECCLevel.Q)` record
   - Derive `PixelsPerModule = Max(1, Ceiling(TargetSizePx / moduleCount))`
   - `moduleCount = data.ModuleMatrix.Count` (from `QRCodeData` after generation)
