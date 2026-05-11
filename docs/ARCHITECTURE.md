@@ -2,57 +2,72 @@
 
 ## Overview
 
-QrApp is a single-process WPF application targeting `net8.0-windows`. The app has no visible main window; instead it lives in the system tray and shows a floating overlay on demand.
+QrApp is a single-process WPF application targeting `net8.0-windows10.0.22000.0` (Windows 11). It lives in the system tray with no visible main window and shows a floating overlay on demand.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        QrApp Process                         │
-│                                                              │
-│  ┌──────────────┐  triggers  ┌────────────────┐             │
-│  │ HotkeyService│───────────▶│SelectionService│             │
-│  └──────────────┘            └───────┬────────┘             │
-│                                      │ text (may be empty)  │
-│                                      ▼                       │
-│                              ┌───────────────┐              │
-│                              │  OcrService   │ (fallback)   │
-│                              │ Win.Media.Ocr │              │
-│                              └───────┬───────┘              │
-│                                      │ raw text             │
-│                                      ▼                       │
-│                          ┌─────────────────────┐            │
-│                          │TextSanitizerService │            │
-│                          │  (strip/replace)    │            │
-│                          └──────────┬──────────┘            │
-│                                     │ clean text            │
-│                                     ▼                       │
-│                             ┌───────────────┐               │
-│                             │ QrCodeService │               │
-│                             └───────┬───────┘               │
-│                                     │ BitmapSource          │
-│                                     ▼                       │
-│                       ┌─────────────────────────┐           │
-│                       │      OverlayWindow       │           │
-│                       │  [editable TextBox] [QR] │           │
-│                       └─────────────────────────┘           │
-│                                                              │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  Tray Icon  →  right-click  →  Settings / Quit      │    │
-│  └─────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                           QrApp Process                              │
+│                                                                      │
+│  ┌──────────────┐  triggers  ┌─────────────────┐                    │
+│  │ HotkeyService│───────────▶│ SelectionService │                    │
+│  └──────────────┘            └────────┬────────┘                    │
+│   (if overlay open:                   │ text (may be empty)         │
+│    close it, open new)                ▼                              │
+│                              ┌─────────────────┐                    │
+│                              │   OcrService     │ ← auto fallback   │
+│                              │ (cursor region)  │                    │
+│                              └────────┬────────┘                    │
+│                                       │ raw text                     │
+│                                       ▼                              │
+│                           ┌──────────────────────┐                  │
+│                           │ TextSanitizerService  │                  │
+│                           └──────────┬───────────┘                  │
+│                                      │ clean text                    │
+│                                      ▼                              │
+│                              ┌───────────────┐                      │
+│                              │ QrCodeService │                      │
+│                              └───────┬───────┘                      │
+│                                      │ BitmapSource                  │
+│                                      ▼                              │
+│                        ┌──────────────────────────┐                 │
+│                        │       OverlayWindow        │                │
+│                        │  [TextBox] [QR] [OCR btn] │                │
+│                        └──────────┬───────────────┘                 │
+│                                   │ OCR button click                 │
+│                                   ▼                                  │
+│                        ┌──────────────────────────┐                 │
+│                        │  RegionSelectorWindow     │                 │
+│                        │  (fullscreen, snip-style) │                 │
+│                        └──────────┬───────────────┘                 │
+│                                   │ Rectangle                        │
+│                                   ▼                                  │
+│                        OcrService.RecognizeRegionAsync()             │
+│                        → TextSanitizerService → QrCodeService        │
+│                        → OverlayWindow (updated)                     │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────┐     │
+│  │  Tray Icon  →  right-click  →  Settings / Quit             │     │
+│  └────────────────────────────────────────────────────────────┘     │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+---
 
 ## Components
 
 ### App.xaml.cs — Application Bootstrap
 
-- Sets `ShutdownMode = OnExplicitShutdown` so the app keeps running with no visible window.
-- Creates and wires together all services: `HotkeyService`, `SelectionService`, `OcrService`, `TextSanitizerService`, `QrCodeService`, `SettingsService`.
-- Owns the `NotifyIcon` (system tray) and its context menu (Settings, Quit).
-- Subscribes to `HotkeyService.HotkeyPressed` and orchestrates the full pipeline: capture → OCR fallback → sanitize → generate → display.
+- Sets `ShutdownMode = OnExplicitShutdown` so the app runs without a visible window.
+- Composes all services: `HotkeyService`, `SelectionService`, `OcrService`, `TextSanitizerService`, `QrCodeService`, `SettingsService`.
+- Owns `NotifyIcon` (tray) and its right-click menu (Settings, Quit).
+- Subscribes to `HotkeyService.HotkeyPressed`:
+  - If an overlay is currently open → close it, then run the full capture pipeline for a fresh one.
+  - Otherwise → run the capture pipeline directly.
+- On startup: applies autostart registry setting from `SettingsService`.
 
 ### HotkeyService
 
-Registers a system-wide hotkey using the Win32 `RegisterHotKey` / `UnregisterHotKey` APIs via a hidden `HwndSource` (message-only window). Exposes:
+Registers a system-wide hotkey via `RegisterHotKey` / `UnregisterHotKey` on a hidden `HwndSource` (message-only window).
 
 ```csharp
 event EventHandler HotkeyPressed;
@@ -60,141 +75,258 @@ void Register(ModifierKeys modifiers, Key key);
 void Unregister();
 ```
 
-`RegisterHotKey` requires a window handle (`HWND`) to post `WM_HOTKEY` messages to. A `HwndSource` created with `HWND_MESSAGE` as parent is the standard WPF pattern; it uses no screen real-estate.
+`HwndSource` with `HWND_MESSAGE` parent provides a `HWND` for `WM_HOTKEY` messages without any screen presence. Hotkey is re-registered immediately when the user changes it in Settings and clicks Apply.
+
+**Behaviour when overlay is open:** App closes the existing `OverlayWindow`, then runs the capture pipeline to open a fresh one. This avoids overlapping overlays.
 
 ### SelectionService
 
-Captures currently selected text without requiring the user to manually copy it first.
+Captures the currently selected text by synthesising `Ctrl+C`.
 
 **Algorithm:**
 
-1. Save current clipboard contents.
-2. Clear the clipboard.
-3. Call `SendInput` to synthesize `Ctrl+C` (key-down + key-up for both VK_CONTROL and VK_C).
-4. Wait up to 300 ms polling `Clipboard.ContainsText()`.
-5. Read the text; restore original clipboard contents.
-6. Return the captured string (empty string if nothing was selected or app ignores Ctrl+C).
+1. Save clipboard contents.
+2. Clear clipboard.
+3. `SendInput`: VK_CONTROL down → VK_C down → VK_C up → VK_CONTROL up.
+4. Poll `Clipboard.ContainsText()` for up to 300 ms.
+5. Read text; restore clipboard.
+6. Return text, or empty string if nothing captured.
 
 **Edge cases:**
 
 | Scenario | Handling |
 |---|---|
-| App that ignores Ctrl+C | Returns empty string → OcrService fallback triggered |
-| Clipboard locked by another process | Retries up to 5× with 20 ms delay (Win32 `OpenClipboard` contention) |
-| Selection contains only whitespace | Treated as empty after sanitization |
-| Selection exceeds QR v40 capacity | QrCodeService throws; overlay shows capacity warning |
+| App ignores Ctrl+C | Returns empty → `OcrService` auto-fallback triggered |
+| Clipboard locked | Retry up to 5× with 20 ms delay |
+| Only whitespace selected | Treated as empty after sanitization |
+| Text exceeds QR v40 limit | `QrCodeService` throws; overlay shows error |
 
-**P/Invoke surface** (all in `NativeMethods.cs`):
+### OcrService
+
+Two modes — both return plain text.
+
+**Auto-fallback** (called when `SelectionService` returns empty):
+
+1. `GetCursorPos` to find cursor position.
+2. Capture a ~600×400 px region centred on the cursor via `Graphics.CopyFromScreen`.
+3. Convert to `SoftwareBitmap` (WinRT).
+4. `OcrEngine.RecognizeAsync(softwareBitmap)` — returns in ~50 ms.
+5. Concatenate line text and return.
+
+**Manual region** (called after user draws a region in `RegionSelectorWindow`):
+
+1. Receive `System.Drawing.Rectangle` from `RegionSelectorWindow`.
+2. Capture exactly that screen rectangle.
+3. Same OCR pipeline as above.
 
 ```csharp
-[DllImport("user32.dll")] static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
-[DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-[DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-[DllImport("user32.dll")] static extern bool GetCursorPos(out POINT lpPoint);
+internal sealed class OcrService
+{
+    private readonly OcrEngine _engine =
+        OcrEngine.TryCreateFromUserProfileLanguages() ??
+        OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en"));
+
+    public Task<string> RecognizeCursorRegionAsync() { ... }
+    public Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect) { ... }
+
+    private async Task<string> RecognizeBitmapAsync(System.Drawing.Bitmap bmp)
+    {
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        ms.Seek(0, SeekOrigin.Begin);
+        var decoder = await BitmapDecoder.CreateAsync(ms.AsRandomAccessStream());
+        var soft = await decoder.GetSoftwareBitmapAsync();
+        var result = await _engine.RecognizeAsync(soft);
+        return string.Join(" ", result.Lines.Select(l => l.Text));
+    }
+}
 ```
 
-### OcrService (fallback)
+`OcrEngine` is created once and reused. `Windows.Media.Ocr` is available via the `net8.0-windows10.0.22000.0` TFM with no extra NuGet package.
 
-Called when `SelectionService` returns empty — i.e. the user triggered the hotkey over content that cannot be Ctrl+C'd (an image, a locked PDF viewer, a game window).
+### RegionSelectorWindow
 
-**How it works:**
+A fullscreen, borderless, `AllowsTransparency="True"` WPF window used for manual OCR region selection. Shown when the user clicks the OCR button in the overlay.
 
-1. Capture a screenshot of the region around the cursor using `System.Drawing.Graphics.CopyFromScreen`.
-2. Convert the bitmap to a `SoftwareBitmap` (WinRT type).
-3. Call `Windows.Media.Ocr.OcrEngine.RecognizeAsync(softwareBitmap)`.
-4. Return the concatenated line text.
+**Behaviour:**
 
-**Why `Windows.Media.Ocr` over Tesseract?**
-It is built into Windows 10 and 11, requires no NuGet package or model files, runs fully offline, and processes a 1080p screenshot in ~50 ms. Tesseract adds a ~50 MB native dependency for comparable accuracy.
+1. Overlay hides itself before showing this window.
+2. Window covers all monitors (use `SystemParameters.VirtualScreen*` bounds).
+3. Background: semi-transparent dark overlay (40% opacity black).
+4. Mouse down: record start point, begin drawing selection rectangle.
+5. Mouse move: update rectangle; fill is slightly lighter than overlay; border is white.
+6. Mouse up: return the screen `Rectangle` to the caller via `TaskCompletionSource<Rectangle?>`.
+7. `Esc`: cancel — sets result to `null`; overlay re-shows with previous content unchanged.
+8. Cursor: `Cursors.Cross`.
 
-**WinRT interop in .NET 8:**
-Add `<TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>` to the csproj and reference `Microsoft.Windows.SDK.Contracts` NuGet to access WinRT APIs from a WPF app without UWP project type.
+```csharp
+internal sealed partial class RegionSelectorWindow : Window
+{
+    private readonly TaskCompletionSource<System.Drawing.Rectangle?> _tcs;
+
+    public static Task<System.Drawing.Rectangle?> SelectAsync()
+    {
+        var tcs = new TaskCompletionSource<System.Drawing.Rectangle?>();
+        new RegionSelectorWindow(tcs).Show();
+        return tcs.Task;
+    }
+}
+```
 
 ### TextSanitizerService
 
-Applied to every captured or OCR'd string before it reaches `QrCodeService` or the overlay `TextBox`.
-
-**Permanent rules** (from `settings.json`, applied in order):
+Applied to every string (from `SelectionService` or `OcrService`) before it reaches `QrCodeService` or the overlay `TextBox`.
 
 ```csharp
 record SanitizerRule(string Match, string Replace, bool IsRegex = false);
+
+internal sealed class TextSanitizerService
+{
+    private readonly IReadOnlyList<SanitizerRule> _rules;
+
+    public string Sanitize(string input)
+    {
+        foreach (var rule in _rules)
+            input = rule.IsRegex
+                ? Regex.Replace(input, rule.Match, rule.Replace)
+                : input.Replace(rule.Match, rule.Replace);
+        return input.Trim();
+    }
+}
 ```
 
-Default ruleset strips:
-- BOM (`﻿`)
-- Zero-width space (`​`)
-- Soft hyphen (`­`)
-- Null bytes (` `)
-- CRLF → LF
-- Trailing whitespace per line
+Regex instances are compiled and cached on construction. Default rules: strip BOM, zero-width spaces, soft hyphens, null bytes; normalise CRLF → LF; strip trailing whitespace per line.
 
-Each rule is either a literal `string.Replace` or, when `IsRegex: true`, a `Regex.Replace` (compiled, cached).
-
-**Temporary edits:** the overlay `TextBox` is two-way bound to `OverlayViewModel.SourceText`. Changing it triggers `QrCodeService.Generate` via a debounced `PropertyChanged` handler (150 ms debounce to avoid generating on every keystroke).
+**Temporary edits:** the overlay `TextBox` is two-way bound to `OverlayViewModel.SourceText`. Edits trigger `QrCodeService.Generate` via a 150 ms debounced `PropertyChanged` handler.
 
 ### QrCodeService
 
-Thin wrapper around [QRCoder](https://github.com/codebude/QRCoder).
-
 ```csharp
-BitmapSource Generate(string text, QrSettings settings);
+internal sealed class QrCodeService
+{
+    public BitmapSource Generate(string text, QrSettings settings)
+    {
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(text, settings.EccLevel);
+        int moduleCount = data.ModuleMatrix.Count;
+        int ppm = Math.Max(1, (int)Math.Ceiling((double)settings.TargetSizePx / moduleCount));
+        using var code = new PngByteQRCode(data);
+        byte[] png = code.GetGraphic(ppm);          // default black on white
+
+        var image = new BitmapImage();
+        using var ms = new MemoryStream(png);
+        image.BeginInit();
+        image.CacheOption  = BitmapCacheOption.OnLoad;
+        image.StreamSource = ms;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+}
+
+record QrSettings(int TargetSizePx = 300, QRCodeGenerator.ECCLevel EccLevel = QRCodeGenerator.ECCLevel.Q);
 ```
 
-- Chooses `ECCLevel.Q` (25% error correction) by default.
-- Renders to `PngByteQRCode` → `byte[]` → `BitmapImage` loaded from `MemoryStream` (no temp files).
-- Calls `image.Freeze()` to make the result safe to pass across threads.
-- `QrSettings` record: `ForegroundColor`, `BackgroundColor`, `TargetSizePx` (200–600, default 300), `ECCLevel`.
-- `PixelsPerModule` is derived: `PixelsPerModule = TargetSizePx / moduleCount`, where `moduleCount = 17 + 4 * version`. Rounded up; actual output may be a few pixels larger than requested.
+`PixelsPerModule` is derived from `TargetSizePx` divided by the actual module count of the generated QR data — so the output closely matches the requested size regardless of QR version. Output is always black on white.
 
 ### OverlayWindow
 
-A borderless, `AllowsTransparency="True"` WPF `Window` that:
+Borderless, `AllowsTransparency="True"` WPF window. Positioned 16 px to the right of the mouse cursor, clamped to the current monitor's work area; flips left if insufficient space.
 
-- Positions itself near the current mouse cursor (`GetCursorPos`), clamped to the current monitor's work area.
-- Layout: editable `TextBox` (top) + `Image` bound to `QrImage` (bottom/right).
-- `TextBox` is two-way bound to `OverlayViewModel.SourceText`; edits regenerate the QR with 150 ms debounce.
-- `Deactivated` → auto-close (configurable, default on).
-- Buttons: **Copy Image**, **Save PNG** (`SaveFileDialog`), **Close** (`Esc`).
-- Capacity warning label appears when `SourceText.Length` approaches QR v40 byte limit at current ECC level.
-- Optional `DispatcherTimer` auto-dismiss after N seconds (0 = disabled).
+- Two-column layout: editable `TextBox` (left) + QR `Image` (right).
+- **OCR button** in the header bar — clicking it:
+  1. Hides `OverlayWindow`.
+  2. Awaits `RegionSelectorWindow.SelectAsync()`.
+  3. If cancelled: re-shows with previous content.
+  4. If rect received: calls `OcrService.RecognizeRegionAsync(rect)` → sanitize → generate → updates `OverlayViewModel` → re-shows.
+- `TextBox` edits regenerate QR with 150 ms debounce.
+- Status bar (single line, full width): hidden by default; amber warning at 80–100% capacity; red error above 100%.
+- Error message text: `"Too much data — edit the text to reduce it."`
+- Warning message text: `"Approaching QR capacity — consider reducing text or switching to ECC L."`
+- Dismiss: focus lost, `Esc`, or auto-dismiss timer.
+- `Deactivated` handler checks if `RegionSelectorWindow` is the newly focused window before closing — if so, does not auto-close.
 
 ### SettingsWindow
 
-A standard WPF `Window` opened from the tray icon's right-click menu. Binds to `SettingsViewModel`, which holds a working copy of settings and exposes `Apply` / `Cancel` commands.
+Standard WPF window, opened from the tray right-click menu. Binds to `SettingsViewModel` (working copy pattern — changes only persist on Apply).
 
 | Control | Setting |
 |---|---|
-| Press-to-record `TextBox` | Hotkey (modifiers + key); re-registers immediately on Apply |
-| `Slider` 200–600 | QR target size in pixels (square enforced; width = height) |
-| Two `ColorPicker` buttons | QR foreground and background color |
-| `ComboBox` (L/M/Q/H) | ECC level, with tooltip explaining tradeoff |
-| `CheckBox` + number field | Overlay auto-dismiss (seconds; 0 = off) |
-| Editable rule list | Symbol filter rules (match, replacement, regex toggle, delete, add) |
+| Press-to-record `TextBox` | Hotkey; re-registers immediately on Apply |
+| `Slider` 200–600, step 50 | QR target size (px); live preview thumbnail |
+| `ComboBox` L/M/Q/H | ECC level |
+| `CheckBox` + seconds field | Overlay auto-dismiss |
+| `CheckBox` | Launch at Windows startup |
+| Editable rule list | Symbol filter rules (match, replace, regex, delete) |
 
-Apply saves to `%APPDATA%\QrApp\settings.json` and takes effect immediately. Cancel discards the working copy.
+Apply saves `settings.json` and applies all changes live. Cancel discards the working copy.
+
+### SettingsService
+
+Loads `%APPDATA%\QrApp\settings.json` on startup; saves on Apply.
+
+**Corruption handling:** if `settings.json` is missing, unreadable, or fails JSON deserialization, the service silently resets to `AppSettings.Default` and overwrites the file.
+
+```csharp
+internal sealed class SettingsService
+{
+    private static readonly string Path =
+        System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "QrApp", "settings.json");
+
+    public AppSettings Load()
+    {
+        try
+        {
+            var json = File.ReadAllText(Path);
+            return JsonSerializer.Deserialize<AppSettings>(json) ?? AppSettings.Default;
+        }
+        catch   // file missing, locked, or malformed JSON
+        {
+            var defaults = AppSettings.Default;
+            Save(defaults);
+            return defaults;
+        }
+    }
+
+    public void Save(AppSettings settings)
+    {
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
+        File.WriteAllText(Path, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    public void ApplyAutostart(bool enable)
+    {
+        const string key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+        using var reg = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(key, writable: true);
+        if (enable)
+            reg?.SetValue("QrApp", Environment.ProcessPath!);
+        else
+            reg?.DeleteValue("QrApp", throwOnMissingValue: false);
+    }
+}
+```
 
 ### Settings Schema
-
-Stored at `%APPDATA%\QrApp\settings.json`, loaded on startup, saved on Apply.
 
 ```json
 {
   "hotkey": { "modifiers": "Ctrl+Shift", "key": "Q" },
   "qr": {
-    "foreground": "#000000",
-    "background": "#FFFFFF",
     "targetSizePx": 300,
     "eccLevel": "Q"
   },
   "overlay": {
     "autoDismissSeconds": 0
   },
+  "autostart": true,
   "sanitizer": {
     "rules": [
-      { "match": "﻿",  "replace": "" },
-      { "match": "​",  "replace": "" },
-      { "match": "­",  "replace": "" },
-      { "match": " ",  "replace": "" },
+      { "match": "\\uFEFF", "replace": "" },
+      { "match": "\\u200B", "replace": "" },
+      { "match": "\\u00AD", "replace": "" },
+      { "match": "\\u0000", "replace": "" },
       { "match": "\r\n",    "replace": "\n" },
       { "match": "\\s+$",   "replace": "", "regex": true }
     ]
@@ -202,9 +334,11 @@ Stored at `%APPDATA%\QrApp\settings.json`, loaded on startup, saved on Apply.
 }
 ```
 
-## QR Code Version Reference
+Unicode escape sequences are used in JSON to avoid invisible characters in the file. `SettingsService` converts them to actual characters before passing to `TextSanitizerService`.
 
-QRCoder selects the version automatically. For planning purposes:
+---
+
+## QR Code Version Reference
 
 | Version | Grid | Max bytes (ECC L) | Max bytes (ECC Q) | Max bytes (ECC H) |
 |---|---|---|---|---|
@@ -214,55 +348,99 @@ QRCoder selects the version automatically. For planning purposes:
 | 20 | 97×97 | 1 273 | 812 | 520 |
 | 40 | 177×177 | 2 953 | 1 663 | 1 273 |
 
-Default ECC Q gives a good balance: 25% of the code can be damaged and still decoded. For very long strings, dropping to ECC L increases capacity to 2 953 bytes at v40, at the cost of resilience.
+QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping to ECC L raises v40 capacity to 2 953 bytes.
+
+---
 
 ## Threading Model
 
 | Thread | Responsibilities |
 |---|---|
-| UI thread (STA) | All WPF, `HwndSource`, `Clipboard` access, `SendInput`, `OcrService` |
-| Background Task | None in v1 — QR generation is fast enough (<5 ms) to run on UI thread |
+| UI thread (STA) | WPF, `HwndSource`, `Clipboard`, `SendInput`, `OcrService`, `RegionSelectorWindow` |
+| None (v1) | QR generation is < 20 ms on the UI thread; no background task needed |
 
-`SelectionService` and `OcrService` must run on the UI thread: `SendInput`, `Clipboard`, and `SoftwareBitmap` capture all require STA.
+`SelectionService` and `OcrService` require STA: `SendInput`, `Clipboard`, `Graphics.CopyFromScreen`, and WinRT `SoftwareBitmap` conversion all have STA affinity.
 
-## Error Handling Strategy
+---
 
-- Empty selection + OCR returns empty → tray tooltip "Nothing to encode" for 2 s; no overlay.
-- Text exceeds QR v40 capacity → overlay shows "Text too long" warning; user can edit down.
-- Hotkey already registered → tray balloon with instructions to change hotkey in settings.
-- All unhandled exceptions → `Application.DispatcherUnhandledException` logs to `%APPDATA%\QrApp\error.log` and shows a tray balloon.
+## Error Handling
+
+| Condition | Behaviour |
+|---|---|
+| Empty selection + empty OCR | Tray tooltip "Nothing to encode" for 2 s; no overlay |
+| Text > v40 capacity | Overlay error: "Too much data — edit the text to reduce it." |
+| Text 80–100% of capacity | Overlay warning: "Approaching QR capacity — consider reducing text or switching to ECC L." |
+| Hotkey already registered | Tray balloon: "Hotkey in use — change it in Settings" |
+| `settings.json` corrupted | Reset to defaults silently, overwrite file |
+| OCR region cancelled | Overlay re-shows with previous content unchanged |
+
+---
 
 ## Security Considerations
 
-- `SendInput` is blocked by UIPI from elevated windows (UAC dialogs, Task Manager) — by design; the app does not request elevation.
-- Clipboard contents are restored after capture to avoid leaking data left on the clipboard.
-- All features (QR generation, OCR) are fully local and offline; no data leaves the machine.
+- `SendInput` is restricted by UIPI — cannot interact with elevated windows (Task Manager, UAC prompts). By design; the app does not request elevation.
+- Clipboard is restored after every capture to avoid leaving sensitive data on it.
+- All processing (QR generation, OCR) is fully local; no data leaves the machine.
+
+---
 
 ## Non-Functional Requirements
 
 | Requirement | Decision |
 |---|---|
-| Windows 11 target | WPF + .NET 8 runs natively on Win 11; `TargetPlatformMinVersion = 10.0.19041` |
-| LTS SDK only | .NET 8 LTS (Nov 2022–Nov 2026); plan migration to .NET 10 LTS when released |
-| Self-contained | `--self-contained true -r win-x64`; entire runtime bundled in the EXE (~60–80 MB); no install prerequisites |
-| No internet required | All features are fully local and offline |
-| No elevation required | All Win32 APIs used work at normal user privilege |
+| OS target | Windows 11 only (`net8.0-windows10.0.22000.0`, `SupportedOSPlatformVersion=10.0.22000.0`) |
+| SDK | .NET 8 LTS (Nov 2022 – Nov 2026); migrate to .NET 10 LTS when released |
+| Distribution | Self-contained single-file EXE (`--self-contained true -r win-x64`); manual distribution of build output |
+| Runtime prerequisites | None — runtime is bundled (~70 MB EXE) |
+| Autostart | Registry key `HKCU\...\Run` written on first launch (default on); togglable in Settings |
+| Elevation | Not required; all Win32 APIs work at standard user privilege |
+| Internet | Not required; all features are local and offline |
+| Updates | Manual — user downloads and replaces EXE |
+| Settings corruption | Reset to defaults, overwrite file |
+| Logging | Not in scope for v1 |
+
+---
+
+## Performance Budget
+
+| Operation | Target |
+|---|---|
+| Hotkey → overlay visible | < 250 ms (including clipboard capture and QR generation) |
+| QR regeneration on text edit | < 50 ms (debounced 150 ms before triggering) |
+| OCR auto-fallback | < 500 ms |
+| OCR manual region | < 500 ms after user releases mouse |
+| Settings window open | < 100 ms |
+
+---
+
+## Acceptance Criteria (v1.0)
+
+The application ships when:
+
+- Built as a self-contained single-file EXE with `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`.
+- Runs on a clean Windows 11 installation with no additional prerequisites.
+- All functional requirements are verified by manual testing.
+- Autostarts on login by default.
+- Settings survive app restart; corrupted settings file is auto-recovered.
+
+---
 
 ## Dependency Graph
 
 ```
-QrApp.csproj
+QrApp.csproj  (net8.0-windows10.0.22000.0)
 ├── QRCoder (NuGet, MIT)
-├── System.Drawing.Common (NuGet, bitmap capture for OCR input)
-├── Microsoft.Windows.SDK.Contracts (NuGet, WinRT/Windows.Media.Ocr access)
+├── System.Drawing.Common (NuGet, screen capture bitmap)
 └── Microsoft.Xaml.Behaviors.Wpf (NuGet, MVVM behaviors)
 ```
 
-No native binary dependencies; `Windows.Media.Ocr` is a WinRT API already present on Windows 10/11.
+`Windows.Media.Ocr` is available directly through the TFM — no extra NuGet package required.
+
+---
 
 ## Future Considerations
 
-- **WinUI 3 migration**: Better overlay/AppWindow APIs and native Mica backdrop; migrate when WinUI 3 stabilises.
-- **.NET 10 LTS migration**: Planned for when .NET 10 ships (Nov 2025); no breaking changes expected for this app.
-- **Background thread for QR generation**: Move `QrCodeService.Generate` off the UI thread with `Task.Run` + dispatcher marshal-back if payload grows to binary data.
-- **Accessibility**: Set `AutomationProperties.Name` on the overlay `Image` to the encoded text so screen readers can announce it.
+- **.NET 10 LTS migration** (Nov 2025): no breaking changes expected.
+- **WinUI 3**: better overlay/AppWindow APIs and native Mica; revisit when stable.
+- **Accessibility**: `AutomationProperties.Name` on the overlay `Image` for screen readers.
+- **Multi-monitor**: RegionSelectorWindow already spans virtual screen; verify DPI scaling per-monitor.
