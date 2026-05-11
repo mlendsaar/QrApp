@@ -68,21 +68,24 @@ Open `src/QrApp/QrApp.csproj` and configure it:
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <Optimize>true</Optimize>
-    <!-- Single-file publish support -->
-    <PublishSingleFile>true</PublishSingleFile>
+    <!-- Self-contained single-file: no .NET runtime required on target machine -->
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.19041.1" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
   </ItemGroup>
 </Project>
@@ -94,6 +97,7 @@ Open `src/QrApp/QrApp.csproj` and configure it:
 cd src/QrApp
 dotnet add package QRCoder --version 1.6.0
 dotnet add package System.Drawing.Common --version 8.0.0
+dotnet add package Microsoft.Windows.SDK.Contracts --version 10.0.19041.1
 dotnet add package Microsoft.Xaml.Behaviors.Wpf --version 1.1.77
 
 cd ../../tests/QrApp.Tests
@@ -336,7 +340,9 @@ Tests must not depend on a real screen or clipboard — mock `SelectionService` 
 
 ## Building for Release
 
-### Self-Contained Single-File EXE
+The app is **always published self-contained** — no .NET runtime required on the target machine. This is a hard project requirement.
+
+### Self-Contained Single-File EXE (standard release)
 
 ```bash
 dotnet publish src/QrApp -c Release -r win-x64 --self-contained true \
@@ -344,17 +350,7 @@ dotnet publish src/QrApp -c Release -r win-x64 --self-contained true \
     -o publish/
 ```
 
-Output: `publish/QrApp.exe` — ~60–80 MB, no runtime required on target machine.
-
-### Framework-Dependent EXE (smaller, requires .NET 8 runtime)
-
-```bash
-dotnet publish src/QrApp -c Release -r win-x64 --self-contained false \
-    -p:PublishSingleFile=true \
-    -o publish/
-```
-
-Output: ~5 MB.
+Output: `publish/QrApp.exe` — ~60–80 MB, runs on any Windows 10 1903+ or Windows 11 machine with no prerequisites.
 
 ### MSIX Package (recommended for distribution)
 
