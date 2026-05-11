@@ -107,7 +107,7 @@
 
 ## Phase 4 — Windows / UI
 
-- [ ] **`RegionSelectorWindow.xaml` / `.cs`**
+- [x] **`RegionSelectorWindow.xaml` / `.cs`**
   - Fullscreen: `Left/Top/Width/Height` from `SystemParameters.VirtualScreen*`
   - `WindowStyle=None`, `AllowsTransparency=True`, `Topmost=True`
   - Background: `#66000000` (40% black overlay)
@@ -118,7 +118,7 @@
   - Instruction text centered at bottom: `"Draw a region to read text from. Esc to cancel."`
   - `SelectAsync()` static factory method
 
-- [ ] **`OverlayWindow.xaml` / `.cs`**
+- [x] **`OverlayWindow.xaml` / `.cs`**
   - `WindowStyle=None`, `AllowsTransparency=True`, acrylic/Mica backdrop
   - Header row (32 px): OCR Region button (left), Close `✕` button (right)
   - Content row: `TextBox` (50%) + QR `Image` (50%), both with 16 px padding
@@ -130,7 +130,7 @@
   - OCR button click: hide self → `RegionSelectorWindow.SelectAsync()` → if rect: OCR → sanitize → generate → update VM → show self; if null: just show self
   - `Esc` key binding → close
 
-- [ ] **`SettingsWindow.xaml` / `.cs`**
+- [x] **`SettingsWindow.xaml` / `.cs`**
   - Standard `Window`, fixed 480 px width, modal
   - Sections: Hotkey, QR Code (size slider + ECC dropdown), Overlay (auto-dismiss), Startup (autostart checkbox), Symbol Filter (rule list)
   - Hotkey field: click → recording mode (accent tint bg, placeholder text); `KeyDown` → capture; `Esc` → cancel recording
@@ -140,7 +140,7 @@
   - Footer: Cancel + Apply buttons (Apply is `IsDefault`)
   - Bind to `SettingsViewModel`
 
-- [ ] **`App.xaml.cs` — wire everything together**
+- [x] **`App.xaml.cs` — wire everything together**
   - `ShutdownMode = OnExplicitShutdown`
   - Instantiate all services; load settings; apply autostart
   - `NotifyIcon` with tray icon, tooltip, right-click menu (Settings, separator, Quit)

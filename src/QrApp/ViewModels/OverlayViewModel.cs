@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -26,7 +27,12 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
 
         _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _debounce.Tick += (_, _) => { _debounce.Stop(); RegenerateQr(); };
+
+        CloseCommand = new RelayCommand(() => RequestClose?.Invoke());
     }
+
+    public ICommand CloseCommand { get; }
+    public Action? RequestClose { get; set; }
 
     public BitmapSource? QrImage
     {

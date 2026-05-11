@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows10.0.22000.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.22000.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
@@ -15,6 +16,10 @@
     <!-- Required for cross-compiling Windows targets from Linux CI -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\tray-icon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="QRCoder" Version="1.6.0" />
