@@ -2,12 +2,12 @@
 
 ## Design Language
 
-Follow the **Windows 11 Fluent Design** conventions — rounded corners, subtle shadows, Segoe UI Variable typography, and restrained use of color. The app is a utility; it should feel lightweight and stay out of the way.
+Follow **Windows 11 Fluent Design** — rounded corners, subtle shadows, Segoe UI Variable typography, restrained color. The app is a utility; it should feel lightweight and stay out of the way.
 
 - Rounded corners: `CornerRadius="8"` on panels, `CornerRadius="4"` on buttons and inputs
-- Acrylic/Mica backdrop on the overlay window for the frosted-glass feel native to Win11
-- No custom chrome — borderless windows only; mimic system style through spacing and shadow
-- Icons: [Segoe Fluent Icons](https://learn.microsoft.com/en-us/windows/apps/design/style/segoe-fluent-icons-font) (built into Windows 11); fall back to Segoe MDL2 Assets on Windows 10
+- Acrylic/Mica backdrop on the overlay for the frosted-glass feel native to Win11
+- No custom chrome — borderless windows only
+- Icons: [Segoe Fluent Icons](https://learn.microsoft.com/en-us/windows/apps/design/style/segoe-fluent-icons-font) (built into Windows 11)
 
 ---
 
@@ -16,17 +16,17 @@ Follow the **Windows 11 Fluent Design** conventions — rounded corners, subtle 
 | Role | Light mode | Dark mode |
 |---|---|---|
 | Background (overlay) | `#F3F3F3` (acrylic tint) | `#202020` (acrylic tint) |
-| Surface (cards/panels) | `#FFFFFF` | `#2C2C2C` |
+| Surface (panels) | `#FFFFFF` | `#2C2C2C` |
 | Border | `#E0E0E0` | `#3D3D3D` |
 | Primary text | `#1A1A1A` | `#F0F0F0` |
-| Secondary text / hint | `#717171` | `#9D9D9D` |
-| Accent (buttons, focus) | Windows system accent color (`SystemAccentColor`) | same |
+| Secondary / hint text | `#717171` | `#9D9D9D` |
+| Accent (focus, buttons) | Windows `SystemAccentColor` | same |
 | Warning background | `#FFF4CE` | `#3D3000` |
 | Warning text | `#7A5800` | `#FFD966` |
 | Error background | `#FDE7E9` | `#3D0009` |
 | Error text | `#C42B1C` | `#FF99A4` |
 
-Use the system accent color for interactive elements (focused `TextBox` border, primary button fill) so the app respects the user's Windows color preference.
+QR codes are always black (`#000000`) on white (`#FFFFFF`) — not user-configurable.
 
 ---
 
@@ -36,75 +36,118 @@ All text uses **Segoe UI Variable** (built into Windows 11).
 
 | Role | Size | Weight | Usage |
 |---|---|---|---|
-| Body | 14 px | Regular | Source text `TextBox`, labels |
-| Caption | 12 px | Regular | Warnings, character count, hints |
+| Body | 14 px | Regular | TextBox content, labels |
+| Caption | 12 px | Regular | Warnings, byte count, hints |
 | Button | 14 px | SemiBold | Button labels |
-| Title (Settings) | 20 px | SemiBold | Settings window header |
-| Section header | 16 px | SemiBold | Settings section labels |
+| Title | 20 px | SemiBold | Settings window header |
+| Section header | 16 px | SemiBold | Settings sections |
 
 ---
 
 ## Overlay Window
 
-The overlay is the primary surface the user sees on every capture. It must open fast, be immediately readable, and require minimal interaction.
+The overlay opens on every capture. It must appear fast and require minimal interaction.
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────┐
-│                                 [✕] Esc │  ← 32 px header bar, close button right
-├───────────────────┬─────────────────────┤
-│                   │                     │
-│  [Editable text   │    QR code image    │
-│   box — captured  │    (square, fills   │
-│   or OCR'd text]  │    available space) │
-│                   │                     │
-│                   │                     │
-├───────────────────┴─────────────────────┤
-│ ⚠ Warning / ✗ Error message (if any)   │  ← single line, colored background
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│  [⬡ OCR Region]                    [✕] Esc  │  ← 32 px header
+├─────────────────────┬────────────────────────┤
+│                     │                        │
+│  [Editable TextBox  │   QR code image        │
+│   captured / OCR'd  │   (square, fills       │
+│   text goes here]   │   column minus 16 px   │
+│                     │   padding each side)   │
+│  142 / 1 663 bytes  │                        │
+├─────────────────────┴────────────────────────┤
+│ ⚠ Warning / ✗ Error message (if any)        │  ← status bar, colored bg
+└──────────────────────────────────────────────┘
 ```
 
 ### Sizing
 
-- Default window size: **560 × 300 px**
-- TextBox column: **50% width**, QR column: **50% width**
-- QR image: square, fills its column minus 16 px padding on each side
-- Minimum window size: **400 × 240 px**
+- Default: **560 × 300 px**
+- TextBox column: 50%, QR column: 50%
+- Minimum: **400 × 240 px**
+- Status bar: 32 px tall, always reserved (opacity toggled, no layout shift)
+
+### Header Bar
+
+- **OCR Region button** (left): triggers `RegionSelectorWindow`; icon is a crosshair or scissors glyph from Segoe Fluent Icons
+- **Close button** (right): `✕`, same as `Esc`; 32×32 px touch target
 
 ### TextBox
 
-- Multi-line, no spell-check (`SpellCheck.IsEnabled="False"`)
-- Monospace font (`Cascadia Mono` or `Consolas`, 13 px) so non-printing characters and symbols are visible
-- Vertical scrollbar visible only when content overflows
-- Placeholder text: `"Selected text will appear here…"`
-- Character count shown bottom-right of the TextBox in caption style: `"142 / 1 663 bytes"`
+- Multi-line, `SpellCheck.IsEnabled="False"`
+- Font: `Cascadia Mono` or `Consolas`, 13 px — monospace makes invisible characters visible
+- Vertical scrollbar on overflow only
+- Placeholder: `"Selected text will appear here…"`
+- Byte count caption below-right: `"142 / 1 663 bytes"` (updates as user types)
 
 ### QR Image
 
-- `Stretch="Uniform"`, `RenderOptions.BitmapScalingMode="NearestNeighbor"` — QR modules must be sharp pixels, never blurry
-- Thin 1 px `#E0E0E0` border around the image area
-- White padding of at least 4 modules (quiet zone) around the QR — QRCoder includes this by default
+- `Stretch="Uniform"`, `RenderOptions.BitmapScalingMode="NearestNeighbor"` — modules must be sharp pixels
+- 1 px `#E0E0E0` border around the image area
+- 4-module quiet zone included by QRCoder by default
 
-### Status Bar (warning/error)
+### Status Bar
 
-- Hidden when there is nothing to report
-- Single line, 32 px tall, full width
-- Warning (80–100% capacity): amber background, `⚠ Approaching QR capacity — consider reducing text or switching to ECC L`
-- Error (> 100% capacity): red background, `✗ Too much data — edit the text to reduce it`
-- Transition: fade in (150 ms opacity), no layout shift (reserve the height always, just toggle opacity)
+- Hidden (opacity 0) when nothing to report
+- Warning (80–100% capacity): amber background — `⚠ Approaching QR capacity — consider reducing text or switching to ECC L`
+- Error (>100% capacity): red background — `✗ Too much data — edit the text to reduce it`
+- Fade in: 150 ms opacity transition
 
 ### Positioning
 
-- Opens 16 px to the right of the mouse cursor horizontally, aligned to cursor vertically
-- Clamped to the current monitor's work area (never off-screen)
-- If insufficient space to the right, flip to the left of the cursor
+- Opens 16 px to the right of the mouse cursor, vertically aligned to cursor
+- Clamped to current monitor work area
+- Flips to the left of the cursor if insufficient space to the right
+
+---
+
+## Region Selector Window
+
+Shown when the user clicks **OCR Region** in the overlay. Covers the full virtual screen (all monitors). The overlay hides itself before this window appears and re-shows after selection completes or is cancelled.
+
+### Layout
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│   (40% opacity dark overlay across entire screen)           │
+│                                                              │
+│        ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐                            │
+│          [selection rectangle]                               │
+│        │   white border, 2 px  │                            │
+│         ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─                             │
+│                                                              │
+│   "Draw a region to read text from.  Esc to cancel."        │
+│   (instruction text, centered, caption size, white)          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Behaviour
+
+- Cursor: `Cursors.Cross`
+- Mouse down: begin selection rectangle
+- Mouse move: update rectangle in real time
+- Mouse up: if region is > 4×4 px, capture and OCR it; otherwise discard
+- `Esc`: cancel — overlay re-shows with its previous text unchanged
+- No keyboard input other than `Esc`
+
+### Visual Style
+
+- Background: `#00000066` (40% black) over full screen
+- Selection rectangle: 2 px solid white border; interior fill `#FFFFFF22` (very faint)
+- Instruction text: white, 13 px, centered horizontally at 80% vertical position
+- No window chrome, no title bar
 
 ---
 
 ## Settings Window
 
-A conventional modal dialog, not a floating overlay. Opens centered on the primary monitor (or centered on the parent if the tray window has a handle).
+A standard modal dialog opened from the tray right-click menu. Not a floating overlay.
 
 ### Layout
 
@@ -113,26 +156,27 @@ A conventional modal dialog, not a floating overlay. Opens centered on the prima
 │  Settings                                    [✕] │  ← 48 px title bar
 ├──────────────────────────────────────────────────┤
 │                                                  │
-│  Hotkey                                          │  ← section header
+│  Hotkey                                          │
 │  ┌──────────────────────────────────────────┐   │
 │  │  Ctrl + Shift + Q          [Click to set] │   │
 │  └──────────────────────────────────────────┘   │
 │                                                  │
 │  QR Code                                         │
-│  Size          [━━━━●━━━━━━━━━] 300 px          │
-│  ECC Level     [Q ▾]  ⓘ                         │
-│  Foreground    [■] #000000                       │
-│  Background    [□] #FFFFFF                       │
+│  Size      [━━━━●━━━━━━━] 300 px  [QR preview]  │
+│  ECC Level [Q ▾]  ⓘ                             │
 │                                                  │
 │  Overlay                                         │
 │  Auto-dismiss  [✓]  after  [5]  seconds          │
 │                                                  │
+│  Startup                                         │
+│  [✓]  Launch QrApp when Windows starts           │
+│                                                  │
 │  Symbol Filter                                   │
 │  ┌──────────────────────────────────────────┐   │
-│  │ Match         Replace     Regex  [Delete] │   │
-│  │ ﻿             (empty)     □      [🗑]     │   │
-│  │ \r\n          \n          □      [🗑]     │   │
-│  │ \s+$          (empty)     ✓      [🗑]     │   │
+│  │ Match       Replace   Regex    [Delete]   │   │
+│  │ ﻿      (empty)   □        [🗑]       │   │
+│  │ \r\n        \n        □        [🗑]       │   │
+│  │ \s+$        (empty)   ✓        [🗑]       │   │
 │  └──────────────────────────────────────────┘   │
 │  [+ Add rule]                                    │
 │                                                  │
@@ -144,61 +188,58 @@ A conventional modal dialog, not a floating overlay. Opens centered on the prima
 ### Sizing
 
 - Fixed width: **480 px**
-- Height: auto (content-driven), min **480 px**, max **80% of screen height** with scroll
+- Height: auto, min **500 px**, max **80% of screen height** with scroll
 
 ### Hotkey Field
 
-- Displays current hotkey as text (`Ctrl + Shift + Q`)
-- On click: enters recording mode — background shifts to accent color tint, text changes to `"Press a key combination…"`
-- On `KeyDown`: capture modifiers + key, display immediately, exit recording mode
-- If the key combo is already taken: show inline error `"This hotkey is in use by another application"`
-- `Esc` cancels recording without changing the value
+- Shows current hotkey as text: `Ctrl + Shift + Q`
+- Click → recording mode: accent tint background, text `"Press a key combination…"`
+- `KeyDown`: capture modifiers + key, display immediately, exit recording mode
+- Conflict: inline error `"This hotkey is in use by another application"`
+- `Esc` during recording: cancel without changing the current hotkey
 
 ### Size Slider
 
-- Range 200–600, step 50
-- Tick marks at 200, 300, 400, 500, 600
-- Current value shown as a label to the right: `300 px`
-- Below the slider, a small live preview thumbnail of a sample QR updates as the slider moves
+- Range 200–600, step 50; tick marks at each step
+- Current value label to the right: `300 px`
+- Small live QR preview thumbnail to the right of the label, updates as slider moves
 
 ### ECC ComboBox
 
 - Options: `L — 7% recovery`, `M — 15% recovery`, `Q — 25% recovery (default)`, `H — 30% recovery`
-- Tooltip on the ⓘ icon: `"Higher recovery = smaller data capacity. Q is a good default."`
+- ⓘ tooltip: `"Higher recovery = smaller data capacity. Q is a good default."`
 
-### Color Pickers
+### Startup Checkbox
 
-- Clicking the color swatch opens the system `ColorDialog` (WPF: use `System.Windows.Forms.ColorDialog` via interop, or a lightweight inline color picker)
-- Swatch is a 24×24 px square with a 1 px border
-- Hex value shown as editable text next to the swatch
+- Label: `"Launch QrApp when Windows starts"`
+- Checked by default
+- On Apply: writes/removes registry key `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\QrApp`
 
 ### Symbol Filter List
 
 - Each row: `TextBox` (match), `TextBox` (replacement), `CheckBox` (regex), `Button` (delete)
-- Non-printable characters shown as their escape sequences (`\r\n`, `​`, etc.) — do not display raw invisible characters in the UI
-- Rows are reorderable via drag handle (optional for v1; document as v2)
+- Non-printable characters displayed as Unicode escapes (`﻿`, `​`, etc.) — never raw invisible characters
 - `[+ Add rule]` appends a blank row and focuses the Match field
 
-### Footer Buttons
+### Footer
 
-- **Cancel**: closes window, discards all unsaved changes
-- **Apply**: validates inputs, saves `settings.json`, applies changes live (re-registers hotkey, updates QR settings), closes window
-- Apply is the default button (`IsDefault="True"`); `Enter` triggers it
-- `Esc` triggers Cancel
+- **Cancel**: discards working copy, closes window
+- **Apply**: validates, saves `settings.json`, applies all settings live (hotkey re-registers, autostart registry updated), closes window
+- Apply is `IsDefault="True"` (`Enter` triggers it); `Esc` triggers Cancel
 
 ---
 
 ## System Tray Icon
 
-- 16×16 px icon, with a 32×32 px version for high-DPI
-- Simple QR code glyph in the system foreground color (adapts to light/dark taskbar)
-- Right-click context menu:
+- 16×16 px + 32×32 px for high-DPI
+- QR code glyph in system foreground color (adapts to light/dark taskbar)
+- Tooltip: `"QrApp — Ctrl+Shift+Q to capture"`
+- Right-click only:
   ```
   Settings
   ─────────
   Quit
   ```
-- No left-click action (avoids conflict with hotkey); tooltip shows `"QrApp — Ctrl+Shift+Q to capture"`
 
 ---
 
@@ -206,7 +247,7 @@ A conventional modal dialog, not a floating overlay. Opens centered on the prima
 
 | Control | Default | Hover | Focused | Disabled |
 |---|---|---|---|---|
-| Button (secondary) | Outlined | Light fill | Accent border | 40% opacity |
+| Button | Outlined | Light fill | Accent border | 40% opacity |
 | TextBox | Subtle border | Border darkens | Accent border, 2 px | 40% opacity |
 | Slider thumb | Accent fill | Scale 110% | Accent + ring | 40% opacity |
 | CheckBox | System default | — | System default | 40% opacity |
@@ -216,7 +257,7 @@ A conventional modal dialog, not a floating overlay. Opens centered on the prima
 ## Accessibility
 
 - All interactive controls have `AutomationProperties.Name` set
-- Overlay `Image` has `AutomationProperties.Name` = the encoded text content
-- Tab order follows visual reading order (left-to-right, top-to-bottom)
-- Minimum touch/click target: 32×32 px
-- Color is never the sole indicator of state — always pair with an icon or text
+- Overlay `Image` has `AutomationProperties.Name` = the encoded text (so screen readers can announce it)
+- Tab order follows visual reading order (top-to-bottom, left-to-right)
+- Minimum click/touch target: 32×32 px
+- State is never communicated by color alone — always paired with an icon or text label

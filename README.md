@@ -1,48 +1,32 @@
 # QrApp
 
-A lightweight .NET 8 Windows 11 native application that instantly generates a QR code from whatever text is currently selected on screen.
+A lightweight .NET 8 Windows 11 application that instantly generates a QR code from whatever text is currently selected on screen.
 
 ## What It Does
 
-Select any text anywhere on your desktop — a URL, phone number, address, Wi-Fi password, or any string — and QrApp captures it, shows it in an editable preview so you can clean it up, then displays a scannable QR code in a small overlay window. No copy-paste, no manual typing.
+Select any text anywhere on your desktop — a URL, phone number, address, Wi-Fi password, or any string — trigger the hotkey, and QrApp shows a floating overlay with the captured text in an editable box and the generated QR code alongside it. No copy-paste, no manual typing.
+
+If the text can't be selected normally (e.g. inside an image or a locked PDF), click the OCR button in the overlay to draw a region on screen — just like Snipping Tool — and QrApp reads the text from that area automatically.
 
 ## How It Works
 
-1. The user selects text with the mouse (or keyboard).
-2. A global hotkey (default: `Ctrl+Shift+Q`) triggers the app.
-3. QrApp reads the selected text from the clipboard (by temporarily sending `Ctrl+C` via the Windows SendInput API).
-4. The overlay opens showing the **captured text in an editable box** alongside the generated QR code.
-5. Editing the text regenerates the QR code in real time.
-6. The overlay auto-dismisses when focus is lost, or the user presses `Esc`.
-
-If no text can be selected (e.g. an image, a locked PDF viewer), the app falls back to **Windows.Media.Ocr** to read text from a screenshot of the selected region.
+1. Select text anywhere on screen.
+2. Press the global hotkey (`Ctrl+Shift+Q` by default).
+3. QrApp captures the selection, sanitizes it, generates the QR code, and opens the overlay.
+4. Edit the text in the overlay if needed — the QR updates live.
+5. Press `Esc` or click away to close. If the hotkey is pressed while the overlay is already open, it closes and a fresh one opens.
 
 ## Tech Stack
 
-| Layer | Choice | Reason |
-|---|---|---|
-| Runtime | .NET 8 (LTS, until Nov 2026) | LTS requirement, best Windows integration |
-| Distribution | Self-contained (`--self-contained true`) | No .NET runtime required on target machine |
-| UI Framework | WPF | Mature, lightweight, excellent Windows 11 look-and-feel |
-| QR Generation | [QRCoder](https://github.com/codebude/QRCoder) | MIT, no native deps, fast, auto version selection |
-| Clipboard/Input | Windows API via P/Invoke | Required for reading active selection |
-| Hotkey registration | Windows `RegisterHotKey` API | System-wide hotkey, no elevated rights needed |
-| Screen OCR fallback | `Windows.Media.Ocr` (built into Windows 10/11) | Local, fast (~50 ms), no extra install |
-| Packaging | MSIX (single-file optional) | Clean install/uninstall, Start Menu entry |
-
-## QR Code Versions
-
-QRCoder selects the version automatically based on text length and ECC level. For reference:
-
-| Version | Grid | Max bytes (ECC Q) | Max alphanumeric (ECC Q) |
-|---|---|---|---|
-| 1 | 21×21 | 13 | 20 |
-| 5 | 37×37 | 85 | 130 |
-| 10 | 57×57 | 271 | 410 |
-| 20 | 97×97 | 812 | 1 231 |
-| 40 | 177×177 | 1 663 | 2 520 |
-
-Default ECC level: **Q** (25% damage recovery). The overlay warns the user when captured text approaches the v40 limit.
+| Layer | Choice |
+|---|---|
+| Runtime | .NET 8 LTS (`net8.0-windows10.0.22000.0`) |
+| UI | WPF |
+| QR generation | [QRCoder](https://github.com/codebude/QRCoder) |
+| Screen OCR | `Windows.Media.Ocr` (built into Windows 11) |
+| Global hotkey / input | Win32 API via P/Invoke |
+| Settings | `System.Text.Json` → `%APPDATA%\QrApp\settings.json` |
+| Distribution | Self-contained single-file EXE |
 
 ## Project Structure
 
@@ -52,30 +36,27 @@ QrApp/
 │   └── QrApp/
 │       ├── QrApp.csproj
 │       ├── App.xaml / App.xaml.cs
-│       ├── MainWindow.xaml          # Hidden host window (system tray)
-│       ├── MainWindow.xaml.cs
-│       ├── OverlayWindow.xaml       # Floating QR display + text editor
-│       ├── OverlayWindow.xaml.cs
-│       ├── SettingsWindow.xaml      # Settings UI (hotkey, QR size, colors, filters)
-│       ├── SettingsWindow.xaml.cs
+│       ├── MainWindow.xaml / .cs          # Hidden host (system tray)
+│       ├── OverlayWindow.xaml / .cs       # Floating QR display + text editor
+│       ├── RegionSelectorWindow.xaml / .cs # Fullscreen snip-style OCR selector
+│       ├── SettingsWindow.xaml / .cs      # Settings dialog
 │       ├── Services/
-│       │   ├── HotkeyService.cs          # Global hotkey via RegisterHotKey
-│       │   ├── SelectionService.cs       # SendInput → clipboard capture
-│       │   ├── OcrService.cs             # Windows.Media.Ocr fallback
-│       │   ├── TextSanitizerService.cs   # Strip/replace unwanted symbols
-│       │   ├── QrCodeService.cs          # QRCoder wrapper → BitmapSource
-│       │   └── SettingsService.cs        # JSON settings load/save
+│       │   ├── HotkeyService.cs
+│       │   ├── SelectionService.cs
+│       │   ├── OcrService.cs
+│       │   ├── TextSanitizerService.cs
+│       │   ├── QrCodeService.cs
+│       │   └── SettingsService.cs
 │       ├── ViewModels/
-│       │   ├── OverlayViewModel.cs       # QrImage, SourceText, StatusText
-│       │   └── SettingsViewModel.cs      # Bindable settings + Apply/Cancel
+│       │   ├── OverlayViewModel.cs
+│       │   └── SettingsViewModel.cs
 │       ├── Helpers/
-│       │   └── NativeMethods.cs          # P/Invoke signatures
+│       │   └── NativeMethods.cs
 │       └── Assets/
 │           ├── icon.ico
 │           └── tray-icon.ico
 ├── tests/
 │   └── QrApp.Tests/
-│       ├── QrApp.Tests.csproj
 │       ├── QrCodeServiceTests.cs
 │       ├── SelectionServiceTests.cs
 │       └── TextSanitizerServiceTests.cs
@@ -92,61 +73,59 @@ QrApp/
 ## Functional Requirements
 
 ### Text Capture
-
-- Capture currently selected text via `SendInput` → clipboard → restore on global hotkey press
-- Fall back to `Windows.Media.Ocr` screenshot capture when clipboard capture returns empty
-- Restore original clipboard contents after every capture attempt
+- Capture selected text via `SendInput` → clipboard → restore on hotkey press
+- Fall back to `Windows.Media.Ocr` (cursor-region screenshot) when clipboard capture returns empty
+- Restore clipboard after every capture attempt
 
 ### Overlay
-
-- Display overlay near mouse cursor, auto-positioned to stay within the current monitor's bounds
-- Show captured text in an editable `TextBox` alongside the generated QR code
-- Regenerate QR code in real time as the user edits the text (150 ms debounce)
-- Show capacity warning when text approaches QR v40 byte limit at current ECC level
-- Show error when text exceeds QR v40 capacity: "Too much data — edit the text to reduce it"
+- Open near the mouse cursor, clamped to the current monitor
+- Show captured text in an editable `TextBox` alongside the QR code
+- Regenerate QR in real time as the user edits (150 ms debounce)
+- **OCR button**: hides overlay, shows `RegionSelectorWindow` for user to draw a screen region; OCRs that region and populates the text box
+- Status bar: warning at 80–100% QR capacity; error above 100% ("Too much data — edit the text to reduce it.")
 - Dismiss on focus loss or `Esc`; optional auto-dismiss timer
+- If hotkey pressed while overlay is open: close the current overlay and open a fresh one
 
 ### QR Generation
-
-- Generate QR code automatically selecting version 1–40 based on text length and ECC level
-- Default ECC level: Q (25% damage recovery)
-- Output size controlled by a user-configured target pixel size (200–600 px); `PixelsPerModule` derived internally
+- Auto-select QR version 1–40 based on text and ECC level
+- Default ECC Q (25% damage recovery); user-configurable
+- Target size 200–600 px (square); `PixelsPerModule` derived from actual module count
+- Output always black on white
 
 ### Symbol Filtering
-
-- **Temporary:** overlay `TextBox` is fully editable per capture
-- **Permanent:** configurable strip/replace rules in `settings.json`, applied automatically on every capture; default rules strip BOM, zero-width spaces, soft hyphens, null bytes, and normalise line endings
+- **Permanent**: configurable strip/replace rules applied on every capture (default rules strip BOM, zero-width spaces, soft hyphens, null bytes; normalise line endings)
+- **Temporary**: editable `TextBox` in overlay for per-capture adjustments
 
 ### Settings
-
-- Open Settings window from system tray right-click menu
-- **Hotkey:** press-to-record input field; re-registers hotkey immediately on Apply
-- **QR target size:** slider 200–600 px (square; width = height enforced)
-- **QR colors:** foreground and background color pickers
-- **ECC level:** dropdown (L / M / Q / H) with tooltip explanation
-- **Overlay auto-dismiss:** toggle + seconds input
-- **Symbol filter rules:** editable list (match, replacement, regex toggle, delete); Add rule button
-- Apply saves to `%APPDATA%\QrApp\settings.json` and takes effect immediately; Cancel discards changes
+- Hotkey (press-to-record)
+- QR target size slider (200–600 px)
+- ECC level dropdown (L / M / Q / H)
+- Overlay auto-dismiss toggle + seconds
+- Launch at Windows startup toggle (default: on)
+- Symbol filter rule list (match, replacement, regex toggle, add/delete)
+- Apply saves immediately; Cancel discards changes
 
 ### System Tray
-
-- Tray icon always present while app is running
-- Right-click menu: **Settings**, **Quit**
+- Icon always present; right-click → Settings / Quit
 
 ## Non-Functional Requirements
 
-| Requirement | Implementation |
-|---|---|
-| Windows 11 target | WPF on .NET 8; `TargetPlatformMinVersion` set to Win 10 1903 minimum, Win 11 recommended |
-| LTS SDK only | .NET 8 (LTS Nov 2022–Nov 2026); migration path to .NET 10 LTS (Nov 2025) documented |
-| Self-contained | Published with `--self-contained true -r win-x64`; no .NET runtime required on target machine |
-| No internet required | All features (QR generation, OCR) are fully local and offline |
-| No elevation required | `SendInput` and `RegisterHotKey` work at normal user privilege |
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#non-functional-requirements) for the full NFR table. Summary:
 
-## Prerequisites
+- **OS**: Windows 11 only
+- **SDK**: .NET 8 LTS
+- **Distribution**: self-contained EXE, manual
+- **Autostart**: on by default (registry)
+- **Internet**: not required
+- **Settings corruption**: auto-reset to defaults
 
-- Windows 10 version 1903+ or Windows 11 (Windows 11 recommended)
-- Visual Studio 2022 17.8+ **or** .NET 8 SDK CLI (build only; no runtime needed on target machine)
+## Prerequisites (build machine)
+
+- Windows 11
+- .NET 8 SDK (`dotnet --version`)
+- Visual Studio 2022 17.8+ or CLI only
+
+No prerequisites on the target machine — the EXE is self-contained.
 
 ## Quick Start
 
@@ -159,9 +138,11 @@ dotnet run --project src/QrApp
 
 Press `Ctrl+Shift+Q` with any text selected to see the overlay.
 
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — build, test, and publish instructions
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — component design and data flow
-- [docs/UI.md](docs/UI.md) — UI layout, color palette, typography, and interaction pointers
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — component design, data flow, NFRs, performance budget, acceptance criteria
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — build, publish, code skeletons, implementation order
+- [docs/UI.md](docs/UI.md) — layout, color palette, typography, interaction design
 
 ## License
 
