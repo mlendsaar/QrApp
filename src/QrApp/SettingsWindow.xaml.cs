@@ -44,7 +44,7 @@ public sealed partial class SettingsWindow : Window
         catch { QrPreviewImage.Source = null; }
     }
 
-    // Hotkey recording
+    // Hotkey recording — click starts recording mode
     private void HotkeyBox_MouseDown(object sender, MouseButtonEventArgs e)
     {
         _vm.StartRecording();
@@ -53,9 +53,10 @@ public sealed partial class SettingsWindow : Window
         e.Handled = true;
     }
 
-    private void HotkeyBox_KeyDown(object sender, KeyEventArgs e)
+    // Key capture at window level so focus on the TextBox is not required
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        if (!_vm.IsRecordingHotkey) return;
+        if (!_vm.IsRecordingHotkey) { base.OnPreviewKeyDown(e); return; }
 
         if (e.Key == Key.Escape)
         {
@@ -68,7 +69,7 @@ public sealed partial class SettingsWindow : Window
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift
                 or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
-            return; // modifiers only — wait for the actual key
+            return; // modifier only — keep waiting
 
         _vm.RecordHotkey(Keyboard.Modifiers, key);
         HotkeyBox.ClearValue(System.Windows.Controls.TextBox.BackgroundProperty);
