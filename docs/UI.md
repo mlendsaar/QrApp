@@ -62,8 +62,6 @@ The overlay is the primary surface the user sees on every capture. It must open 
 │                   │                     │
 ├───────────────────┴─────────────────────┤
 │ ⚠ Warning / ✗ Error message (if any)   │  ← single line, colored background
-├─────────────────────────────────────────┤
-│  [⎘ Copy image]  [↓ Save PNG]          │  ← right-aligned action buttons
 └─────────────────────────────────────────┘
 ```
 
@@ -95,12 +93,6 @@ The overlay is the primary surface the user sees on every capture. It must open 
 - Warning (80–100% capacity): amber background, `⚠ Approaching QR capacity — consider reducing text or switching to ECC L`
 - Error (> 100% capacity): red background, `✗ Too much data — edit the text to reduce it`
 - Transition: fade in (150 ms opacity), no layout shift (reserve the height always, just toggle opacity)
-
-### Buttons
-
-- Secondary style (outlined, not filled) — these are supporting actions, not the primary CTA
-- 32 px height, 12 px horizontal padding, `CornerRadius="4"`
-- Keyboard shortcuts shown in tooltip: `Copy image (Ctrl+Shift+C)`, `Save PNG (Ctrl+S)`
 
 ### Positioning
 
