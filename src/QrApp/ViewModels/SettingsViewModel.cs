@@ -132,6 +132,18 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
         set { _working.Overlay.ShowOcrButton = value; OnPropertyChanged(); }
     }
 
+    public bool PinOverlay
+    {
+        get => _working.Overlay.PinOverlay;
+        set { _working.Overlay.PinOverlay = value; OnPropertyChanged(); }
+    }
+
+    public bool WatchClipboard
+    {
+        get => _working.Overlay.WatchClipboard;
+        set { _working.Overlay.WatchClipboard = value; OnPropertyChanged(); }
+    }
+
     // ── OCR ──────────────────────────────────────────────────────────────────
 
     public bool OcrUpscaleEnabled
@@ -201,7 +213,13 @@ internal sealed class SettingsViewModel : INotifyPropertyChanged
     {
         Hotkey    = new HotkeyConfig { Modifiers = src.Hotkey.Modifiers, Key = src.Hotkey.Key },
         Qr        = new QrCodeConfig { TargetSizePx = src.Qr.TargetSizePx, EccLevel = src.Qr.EccLevel },
-        Overlay   = new OverlayConfig { AutoDismissSeconds = src.Overlay.AutoDismissSeconds, ShowOcrButton = src.Overlay.ShowOcrButton },
+        Overlay   = new OverlayConfig
+        {
+            AutoDismissSeconds = src.Overlay.AutoDismissSeconds,
+            ShowOcrButton      = src.Overlay.ShowOcrButton,
+            PinOverlay         = src.Overlay.PinOverlay,
+            WatchClipboard     = src.Overlay.WatchClipboard,
+        },
         Ocr       = new OcrConfig { UpscaleEnabled = src.Ocr.UpscaleEnabled, PreserveLines = src.Ocr.PreserveLines },
         Autostart = src.Autostart,
         Sanitizer = new SanitizerConfig { Rules = src.Sanitizer.Rules.Select(r => r with { }).ToList() },

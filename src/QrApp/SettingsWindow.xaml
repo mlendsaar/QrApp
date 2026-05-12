@@ -163,14 +163,24 @@
                     <TextBlock Text="seconds" VerticalAlignment="Center"
                                FontSize="14" FontFamily="Segoe UI Variable" />
                 </StackPanel>
-                <CheckBox Content="Show OCR Region button in overlay"
-                          IsChecked="{Binding ShowOcrButton}"
+                <CheckBox Content="Pin overlay (do not auto-hide when clicking elsewhere)"
+                          IsChecked="{Binding PinOverlay}"
                           Margin="0,8,0,0"
                           Style="{StaticResource ToggleSwitch}"
-                          AutomationProperties.Name="Show OCR Region button" />
+                          AutomationProperties.Name="Pin overlay" />
+                <CheckBox Content="Watch clipboard (regenerate QR when clipboard content changes)"
+                          IsChecked="{Binding WatchClipboard}"
+                          Margin="0,8,0,0"
+                          Style="{StaticResource ToggleSwitch}"
+                          AutomationProperties.Name="Watch clipboard for changes" />
 
                 <!-- OCR -->
                 <TextBlock Text="OCR" Style="{StaticResource SectionHeader}" />
+                <CheckBox Content="Show OCR Region button in overlay"
+                          IsChecked="{Binding ShowOcrButton}"
+                          Margin="0,0,0,8"
+                          Style="{StaticResource ToggleSwitch}"
+                          AutomationProperties.Name="Show OCR Region button" />
                 <CheckBox Content="Upscale image before recognition (improves accuracy on small text)"
                           IsChecked="{Binding OcrUpscaleEnabled}"
                           Margin="0,0,0,8"

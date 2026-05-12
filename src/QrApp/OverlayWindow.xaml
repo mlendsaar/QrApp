@@ -42,6 +42,8 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Grid.Effect>
                     <BlurEffect Radius="0" />
@@ -60,8 +62,32 @@
                         AutomationProperties.Name="Capture OCR region"
                         Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}" />
 
+                <ToggleButton x:Name="PinToggle"
+                              Grid.Column="1"
+                              Content="📌"
+                              Width="32" Height="32"
+                              VerticalAlignment="Center"
+                              FontSize="14"
+                              Checked="PinToggle_Changed"
+                              Unchecked="PinToggle_Changed"
+                              AutomationProperties.Name="Pin overlay"
+                              ToolTip="Pin overlay — do not auto-hide on click-away"
+                              Style="{StaticResource {x:Static ToolBar.ToggleButtonStyleKey}}" />
+
+                <ToggleButton x:Name="WatchToggle"
+                              Grid.Column="2"
+                              Content="👁"
+                              Width="32" Height="32"
+                              VerticalAlignment="Center"
+                              FontSize="14"
+                              Checked="WatchToggle_Changed"
+                              Unchecked="WatchToggle_Changed"
+                              AutomationProperties.Name="Watch clipboard"
+                              ToolTip="Watch clipboard — regenerate QR when clipboard changes"
+                              Style="{StaticResource {x:Static ToolBar.ToggleButtonStyleKey}}" />
+
                 <Button x:Name="HelpButton"
-                        Grid.Column="1"
+                        Grid.Column="3"
                         Content="?"
                         Click="HelpButton_Click"
                         Width="32" Height="32"
@@ -72,7 +98,7 @@
                     <Button.ToolTip>Kasutusjuhend</Button.ToolTip>
                 </Button>
 
-                <Button Grid.Column="2"
+                <Button Grid.Column="4"
                         Content="✕"
                         Click="CloseButton_Click"
                         Width="32" Height="32"

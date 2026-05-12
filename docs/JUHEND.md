@@ -9,8 +9,8 @@
 5. [Seadete muutmine](#seadete-muutmine)
    - [Hotkey](#hotkey)
    - [QR Code — suurus ja veaparandus](#qr-code--suurus-ja-veaparandus)
-   - [Overlay — automaatne sulgemine ja OCR-nupp](#overlay--automaatne-sulgemine-ja-ocr-nupp)
-   - [OCR — tekstituvastuse seaded](#ocr--tekstituvastuse-seaded)
+   - [Overlay — automaatne sulgemine, kinnitus ja lõikelaua jälgimine](#overlay--automaatne-sulgemine-kinnitus-ja-lõikelaua-jälgimine)
+   - [OCR — tekstituvastus ja nupu kuvamine](#ocr--tekstituvastus-ja-nupu-kuvamine)
    - [Startup — automaatkäivitus](#startup--automaatkäivitus)
    - [Symbol Filter — teksti puhastusreeglid](#symbol-filter--teksti-puhastusreeglid)
 
@@ -60,7 +60,7 @@ Ekraanile ilmub aken kahe osaga, mis avaneb selle ekraani keskel, kus hetkel asu
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  [⬡ OCR]  (peidetud vaikimisi)            [?] [✕]  │  ← lohistatav riba
+│  [⬡ OCR]  (peidetud)        [📌] [👁] [?] [✕]      │  ← lohistatav riba
 ├──────────────────────────┬──────────────────────────┤
 │  Kopeeritud tekst        │                          │
 │  (muudetav)              │      QR-kood             │
@@ -73,8 +73,30 @@ Ekraanile ilmub aken kahe osaga, mis avaneb selle ekraani keskel, kus hetkel asu
 - **Parem pool** — QR-kood; skanneeri telefoni kaameraga
 - QR uuendub automaatselt iga kord, kui teksti muudad
 - **Ülemine riba on lohistatav** — saad akna ekraanil ringi tõsta enne, kui kasutad OCR-i
+- **`📌` nupp** — kinnitab akna (vt. *Kinnita aken*); kui sisse lülitatud, ei sulgu aken hiireklikist väljapool
+- **`👁` nupp** — lülitab sisse lõikelaua jälgimise (vt. *Lõikelaua jälgimine*); QR-kood värskendub iga kord, kui kopeerid uue teksti
 - **`?` nupp** — avab selle juhendi
 - **`✕` nupp** — peidab akna (sama mis `Esc`)
+
+### Kinnita aken (📌)
+
+Vaikimisi sulgub overlay automaatselt, kui klikid mujale (näiteks teisele aknale). See on mugav kiireks skannimiseks, aga segab, kui tahad QR-koodi võrrelda mõne muu materjaliga.
+
+- Vajuta **`📌`** nuppu päises → aken jääb avatuks ka siis, kui klikid mujale
+- Vajuta uuesti → tavakäitumine taastub
+- Vaikeväärtuse saad seada **Seaded → Overlay → Pin overlay**
+
+`Esc`, `✕` ja hotkey uuesti vajutamine sulgevad akna ka kinnitatud režiimis.
+
+### Lõikelaua jälgimine (👁)
+
+Kui see on sisse lülitatud, jälgib QrApp pidevalt lõikelauda ja genereerib uue QR-koodi iga kord, kui kopeerid uue teksti — hotkey vajutamine ei ole vajalik.
+
+- Vajuta **`👁`** nuppu päises → jälgimine algab; kopeeri (`Ctrl+C`) suvaline tekst → QR-kood uueneb kohe
+- Vajuta uuesti → jälgimine peatub
+- Vaikeväärtuse saad seada **Seaded → Overlay → Watch clipboard**
+
+> Soovitus: kombineeri `📌` (kinnita aken) ja `👁` (lõikelaua jälgimine) — saad QR-genereerimise „peo režiimi", kus iga uus `Ctrl+C` ilmutab uue QR-koodi ja aken jääb püsivalt nähtavale.
 
 ### Akna sulgemine
 
@@ -99,7 +121,7 @@ Mõnikord ei saa teksti tavaliselt kopeerida — näiteks ekraanipildil, skaneer
 **OCR on vaikimisi peidetud.** Selle nähtavaks tegemiseks:
 
 1. Ava seaded: süsteemisalve ikoonil parem-klikk → **Settings**
-2. Sektsioonis **Overlay** lülita sisse **Show OCR Region button**
+2. Sektsioonis **OCR** lülita sisse **Show OCR Region button**
 3. Vajuta **Apply**
 
 Edaspidi ilmub overlay ülaservas nupp **⬡ OCR Region**.
@@ -173,7 +195,7 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 
 ---
 
-### Overlay — automaatne sulgemine ja OCR-nupp
+### Overlay — automaatne sulgemine, kinnitus ja lõikelaua jälgimine
 
 #### Auto-dismiss (automaatne sulgemine)
 
@@ -185,6 +207,37 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 - `0` sekundit (linnuke väljas) = overlay jääb avatuks kuni käsitsi sulgemiseni
 - Kasulik kui skanneerid peavad saama koodi pärast — overlay ei sulgu enne, kui jõuad telefoni võtta
 
+#### Pin overlay (kinnita aken)
+
+**Mis see on:** kui sisse lülitatud, ei sulgu overlay enam automaatselt, kui klikid akna kõrvale.
+
+**Vaikimisi:** välja lülitatud.
+
+**Tagajärjed:**
+- Sisse lülitatud → akna saab kõrval pidada ka teisi rakendusi kasutades. `Esc`, `✕` ja hotkey uuesti vajutamine sulgevad akna ikkagi.
+- Välja lülitatud → tavakäitumine — overlay peitub iga klikiga väljapoole
+
+> Sama saab vahetada lendult overlay päises oleva **📌** nupu kaudu.
+
+#### Watch clipboard (lõikelaua jälgimine)
+
+**Mis see on:** kui sisse lülitatud, jälgib QrApp avatud overlayl pidevalt lõikelauda ja genereerib uue QR-koodi iga kord, kui kopeerid uue teksti — hotkey vajutamine ei ole vajalik.
+
+**Vaikimisi:** välja lülitatud.
+
+**Tagajärjed:**
+- Sisse lülitatud → iga `Ctrl+C` (kui sisu erineb praegusest) uuendab overlayl näidatavat teksti ja QR-koodi (kontroll iga ~500 ms)
+- Välja lülitatud → tavakäitumine — uus tekst loetakse ainult hotkey vajutamisel
+- Jälgimine töötab ainult senikaua, kui overlay on avatud
+
+> Sama saab vahetada lendult overlay päises oleva **👁** nupu kaudu.
+
+---
+
+### OCR — tekstituvastus ja nupu kuvamine
+
+Need seaded mõjutavad OCR-funktsiooni (vt. peatükk *OCR — tekst pildilt või PDF-ist*).
+
 #### Show OCR Region button
 
 **Mis see on:** lülitab sisse/välja OCR-nupu overlay ülaservas.
@@ -194,12 +247,6 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 **Tagajärjed:**
 - Sisse lülitatud → overlay ülaservas on näha nupp **⬡ OCR Region**
 - Välja lülitatud → nupp on peidetud, overlay on puhtam
-
----
-
-### OCR — tekstituvastuse seaded
-
-Need seaded mõjutavad ainult OCR-funktsiooni (vt. peatükk *OCR — tekst pildilt või PDF-ist*).
 
 #### Upscale region before recognition (suurenda piirkonda enne tuvastust)
 
