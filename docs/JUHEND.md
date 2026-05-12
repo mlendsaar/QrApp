@@ -60,7 +60,7 @@ Ekraanile ilmub aken kahe osaga, mis avaneb selle ekraani keskel, kus hetkel asu
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  [⬡ OCR]  (peidetud vaikimisi)            [?] [✕]    │  ← lohistatav riba
+│  [⬡ OCR]  (peidetud vaikimisi)            [?] [✕]  │  ← lohistatav riba
 ├──────────────────────────┬──────────────────────────┤
 │  Kopeeritud tekst        │                          │
 │  (muudetav)              │      QR-kood             │
