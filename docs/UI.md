@@ -203,7 +203,7 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 
 ### Sizing
 
-- Fixed width: **480 px**
+- Fixed width: **620 px** (wide enough for the longest toggle labels and a roomy slider)
 - Height: auto, min **500 px**, max **80% of screen height** with scroll
 
 ### Hotkey Field
