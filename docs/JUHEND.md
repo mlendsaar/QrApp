@@ -150,9 +150,10 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 **Vahemik:** 200–600 px, samm 50 px. Eelvaade uuendub liuguri liigutamisel.
 
 **Tagajärjed:**
-- Suurem pilt = selgem, kergem skaneerida kaugelt
+- Suurem pilt = selgem, kergem skaneerida kaugelt; overlay aken kasvab koos QR-koodiga
 - Väiksem pilt = mahutatavam ekraanile
 - Suurus ei mõjuta QR-koodi andmemahtu — see sõltub ainult ECC tasemest ja teksti pikkusest
+- Muudatus jõustub järgmise overlay avamise korral (vajuta hotkey'd uuesti)
 
 #### ECC Level (veaparanduse tase)
 
