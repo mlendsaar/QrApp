@@ -10,6 +10,10 @@ internal sealed class QrCodeService
     {
         using var generator = new QRCodeGenerator();
         using var data      = generator.CreateQrCode(text, settings.EccLevel);
+
+        // QRCoder expects pixels-per-module, but the user configures a target image size.
+        // The module-matrix dimension depends on text length and ECC level, so we derive
+        // PPM after generation. Ceiling + Max(1, …) keeps the QR readable for short input.
         int moduleCount     = data.ModuleMatrix.Count;
         int ppm             = Math.Max(1, (int)Math.Ceiling((double)settings.TargetSizePx / moduleCount));
         using var code      = new PngByteQRCode(data);
@@ -25,6 +29,8 @@ internal sealed class QrCodeService
         return image;
     }
 
+    // QR v40 byte-mode capacity per ECC level (ISO/IEC 18004). Used by the
+    // status-bar threshold checks to warn before generation would overflow.
     public static int GetMaxBytes(QRCodeGenerator.ECCLevel eccLevel) => eccLevel switch
     {
         QRCodeGenerator.ECCLevel.L => 2953,

@@ -32,6 +32,7 @@ internal sealed class SettingsService
 
     public void ApplyAutostart(bool enable)
     {
+        // HKCU (not HKLM) — per-user autostart works without elevation.
         const string regKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(regKey, writable: true);
         if (enable) key?.SetValue("QrApp", Environment.ProcessPath!);

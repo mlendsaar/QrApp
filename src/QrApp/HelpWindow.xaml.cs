@@ -15,6 +15,8 @@ public sealed partial class HelpWindow : Window
 
     private void LoadContent()
     {
+        // JUHEND.md is bundled as an EmbeddedResource (see QrApp.csproj) so the
+        // user guide ships inside the single-file EXE — no companion file needed.
         var assembly = Assembly.GetExecutingAssembly();
         using var stream = assembly.GetManifestResourceStream("JUHEND.md");
         if (stream is null) { Browser.NavigateToString("<p>Help content not found.</p>"); return; }
@@ -31,6 +33,10 @@ public sealed partial class HelpWindow : Window
         Browser.NavigateToString(BuildHtml(body));
     }
 
+    // Raw-string prefix $$""" — the doubled $$ makes {{ }} the interpolation
+    // markers so single { } in the CSS below are treated as literals (avoids CS9006).
+    // The X-UA-Compatible tag forces the WebBrowser (IE/Trident) into the
+    // latest rendering mode rather than IE7 quirks.
     private static string BuildHtml(string body) => $$"""
         <!DOCTYPE html>
         <html>

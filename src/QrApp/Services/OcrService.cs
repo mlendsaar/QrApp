@@ -9,6 +9,8 @@ namespace QrApp;
 
 internal sealed class OcrService
 {
+    // Prefer the user's installed language packs. Fall back to English so the
+    // service still works on minimal Windows installs that lack OCR languages.
     private readonly OcrEngine _engine =
         OcrEngine.TryCreateFromUserProfileLanguages() ??
         OcrEngine.TryCreateFromLanguage(new Language("en"))!;

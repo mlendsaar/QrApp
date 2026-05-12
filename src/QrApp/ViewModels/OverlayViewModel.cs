@@ -26,6 +26,9 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         _qrService  = qrService;
         _qrSettings = qrSettings;
 
+        // Debounce typing in the overlay TextBox: regenerating the QR on every
+        // keystroke is expensive enough to feel laggy at long inputs. 150 ms
+        // is below the user's perception of latency but coalesces fast typing.
         _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _debounce.Tick += (_, _) => { _debounce.Stop(); RegenerateQr(); };
 
@@ -108,6 +111,8 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         {
             QrImage = _qrService.Generate(_sourceText, _qrSettings);
 
+            // 80 % warning gives the user runway to trim before QRCoder throws;
+            // 100 %+ is impossible to encode and surfaces as an error banner.
             if (pct >= 1.0)
             {
                 StatusText  = "Too much data — edit the text to reduce it.";

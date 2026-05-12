@@ -66,10 +66,12 @@ public sealed partial class SettingsWindow : Window
             return;
         }
 
+        // When Alt is held WPF reports Key.System and the real key in SystemKey.
+        // Unwrap that here so e.g. Alt+F2 records as F2 with Alt modifier.
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift
                 or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
-            return; // modifier only — keep waiting
+            return; // modifier only — keep waiting for a non-modifier key
 
         _vm.RecordHotkey(Keyboard.Modifiers, key);
         HotkeyBox.ClearValue(System.Windows.Controls.TextBox.BackgroundProperty);
