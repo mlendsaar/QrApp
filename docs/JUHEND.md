@@ -7,6 +7,14 @@
 3. [Standardkasutus](#standardkasutus)
 4. [OCR — tekst pildilt või PDF-ist](#ocr--tekst-pildilt-või-pdf-ist)
 5. [Seadete muutmine](#seadete-muutmine)
+   - [Hotkey](#hotkey)
+   - [QR Code — suurus ja veaparandus](#qr-code--suurus-ja-veaparandus)
+   - [Overlay — automaatne sulgemine ja OCR-nupp](#overlay--automaatne-sulgemine-ja-ocr-nupp)
+   - [OCR — tekstituvastuse seaded](#ocr--tekstituvastuse-seaded)
+   - [Startup — automaatkäivitus](#startup--automaatkäivitus)
+   - [Symbol Filter — teksti puhastusreeglid](#symbol-filter--teksti-puhastusreeglid)
+
+> Juhend on alati kättesaadav ka rakenduse seest: vajuta overlay ülaribal **`?`** nuppu või seadetes ECC Level kõrval olevat **ⓘ** nuppu.
 
 ---
 
@@ -48,11 +56,11 @@ QrApp loeb lõikelaualt teksti, puhastab selle ja genereerib QR-koodi.
 
 ### Samm 3 — Skanneeri
 
-Ekraanile ilmub aken kahe osaga:
+Ekraanile ilmub aken kahe osaga, mis avaneb selle ekraani keskel, kus hetkel asub hiirekursor:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                                           [✕]        │
+│  [⬡ OCR]  (peidetud vaikimisi)            [?] [✕]    │  ← lohistatav riba
 ├──────────────────────────┬──────────────────────────┤
 │  Kopeeritud tekst        │                          │
 │  (muudetav)              │      QR-kood             │
@@ -64,12 +72,16 @@ Ekraanile ilmub aken kahe osaga:
 - **Vasak pool** — tekst, mida QR-kood sisaldab; saad seda käsitsi muuta
 - **Parem pool** — QR-kood; skanneeri telefoni kaameraga
 - QR uuendub automaatselt iga kord, kui teksti muudad
+- **Ülemine riba on lohistatav** — saad akna ekraanil ringi tõsta enne, kui kasutad OCR-i
+- **`?` nupp** — avab selle juhendi
+- **`✕` nupp** — peidab akna (sama mis `Esc`)
 
 ### Akna sulgemine
 
 - Vajuta **`Esc`**
 - Kliki akna väljaspool
 - Vajuta **`✕`** nuppu
+- Vajuta **hotkey'd uuesti** — eelmine aken sulgub ja avatakse uus, mis loeb lõikelaualt värske teksti
 
 ### Kui teksti on liiga palju
 
@@ -151,7 +163,7 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 | L | 7% | 2 953 baiti | Puhas digikeskkond, ekraanilt skaneerides |
 | M | 15% | 2 331 baiti | Üldine kasutus |
 | **Q** | **25%** | **1 663 baiti** | **Vaikimisi — hea tasakaal** |
-| H | 30% | 1 273 baiti | Prinditud koodid, võimalik mustus/kulуmine |
+| H | 30% | 1 273 baiti | Prinditud koodid, võimalik mustus/kulumine |
 
 **Tagajärjed:**
 - Madalam tase (L) → rohkem teksti mahub QR-koodi, aga vähem vastupidav kahjustusele
@@ -184,6 +196,32 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 
 ---
 
+### OCR — tekstituvastuse seaded
+
+Need seaded mõjutavad ainult OCR-funktsiooni (vt. peatükk *OCR — tekst pildilt või PDF-ist*).
+
+#### Upscale region before recognition (suurenda piirkonda enne tuvastust)
+
+**Mis see on:** enne OCR-i tegemist suurendab QrApp valitud piirkonna pilti kuni 3× (bikuubilise interpolatsiooniga, max 4800 px küljel).
+
+**Vaikimisi:** sisse lülitatud.
+
+**Tagajärjed:**
+- Sisse → väikese kirjaga tekst tuvastatakse oluliselt paremini; OCR võtab veidi kauem
+- Välja → kasulik, kui piirkond on juba suur ja terav (säästab pisut aega)
+
+#### Preserve line breaks in result (säilita reavahetused)
+
+**Mis see on:** määrab, kuidas tuvastatud read ühendatakse.
+
+**Vaikimisi:** sisse lülitatud.
+
+**Tagajärjed:**
+- Sisse → read eraldatakse reavahetusega (`\n`). Sobib loendite, koodi ja tabelite jaoks.
+- Välja → read ühendatakse ühe tühikuga. Sobib lihtsale jooksvale tekstile, mis on pildis murtud mitmele reale.
+
+---
+
 ### Startup — automaatkäivitus
 
 **Mis see on:** QrApp käivitub automaatselt koos Windowsiga.
@@ -201,10 +239,13 @@ Ava seaded: süsteemisalve ikoonil **parem-klikk → Settings**
 **Mis see on:** reeglid, mida rakendatakse automaatselt igale kopeeritud tekstile enne QR-koodi genereerimist.
 
 **Vaikimisi reeglid** eemaldavad:
-- BOM-märgi (`﻿`) — sageli tekib UTF-8 failidest
-- Null-laiusega tühikud ja pehmenduskrüüpsud — nähtamatud märgid veebilehekülgedelt
+- BOM-märgi (`U+FEFF`) — sageli tekib UTF-8 failidest
+- Null-laiusega tühikuid (`U+200B`) ja pehmeid sidekriipse (`U+00AD`) — nähtamatud märgid veebilehekülgedelt
+- Asendab mitte-katkestava tühiku (`U+00A0`) tavalise tühikuga
 - Normaliseerib reavahetused (`\r\n` → `\n`)
-- Eemaldab ridade lõpus olevad tühikud
+- Eemaldab ridade lõpus olevad tühikud (regex `\s+$`)
+
+Need märgid ei ole tekstis nähtavad, kuid suurendavad QR-koodi mahtu asjatult.
 
 **Reegli muutmine:**
 

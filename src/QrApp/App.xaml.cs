@@ -21,6 +21,8 @@ public sealed partial class App : System.Windows.Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        // No main window — the app lives in the tray. Without OnExplicitShutdown
+        // WPF would exit as soon as the overlay (a transient Window) closes.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         _settings         = _settingsService.Load();
@@ -70,6 +72,9 @@ public sealed partial class App : System.Windows.Application
 
     private async void OnHotkeyPressed(object? sender, EventArgs e)
     {
+        // Re-pressing the hotkey while an overlay is open is treated as
+        // "capture again": close the stale overlay so the new clipboard
+        // content is used and the window re-anchors to the active monitor.
         if (_overlay is not null)
         {
             _overlay.Close();

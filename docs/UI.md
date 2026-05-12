@@ -52,7 +52,7 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 
 ```
 ┌──────────────────────────────────────────────┐
-│  [⬡ OCR Region] (hidden by default)  [✕] Esc│  ← 32 px header
+│  [⬡ OCR Region] (hidden by default)   [?] [✕]│  ← 32 px header (draggable)
 ├─────────────────────┬────────────────────────┤
 │                     │                        │
 │  [Editable TextBox  │   QR code image        │
@@ -65,6 +65,8 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 └──────────────────────────────────────────────┘
 ```
 
+The header bar acts as a drag handle (`MouseLeftButtonDown` → `DragMove()`); clicks on the buttons themselves are excluded so they fire normally.
+
 ### Sizing
 
 - Default: **560 × 300 px**
@@ -75,7 +77,8 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 ### Header Bar
 
 - **OCR Region button** (left): hidden by default (`Visibility.Collapsed`); shown when `Overlay.ShowOcrButton = true` in settings. Triggers `RegionSelectorWindow`; icon is a crosshair glyph from Segoe Fluent Icons.
-- **Close button** (right): `✕`, same as `Esc`; 32×32 px touch target
+- **Help button** (`?`, right): opens `HelpWindow` (a `WebBrowser`-backed window that renders the embedded Estonian user guide `JUHEND.md` via Markdig).
+- **Close button** (`✕`, right): hides the overlay (does not destroy it); same as `Esc`. 32×32 px touch target.
 
 ### TextBox
 
@@ -100,9 +103,8 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 
 ### Positioning
 
-- Opens 16 px to the right of the mouse cursor, vertically aligned to cursor
-- Clamped to current monitor work area
-- Flips to the left of the cursor if insufficient space to the right
+- Opens **centred on the work area of the monitor that contains the cursor** at hotkey time. Implemented with `MonitorFromPoint` + `GetMonitorInfo` (WPF's `SystemParameters` returns only the primary screen, so the overlay would otherwise drift onto the wrong monitor).
+- The header bar is a drag handle, so the user can reposition the overlay freely before triggering an OCR region selection.
 
 ---
 
@@ -169,6 +171,10 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 │  Auto-dismiss  [✓]  after  [5]  seconds          │
 │  [○] Show OCR Region button in overlay           │  ← toggle switch (default off)
 │                                                  │
+│  OCR                                             │
+│  [●] Upscale region before recognition           │  ← toggle switch (default on)
+│  [●] Preserve line breaks in result              │  ← toggle switch (default on)
+│                                                  │
 │  Startup                                         │
 │  [✓]  Launch QrApp when Windows starts           │
 │                                                  │
@@ -208,15 +214,17 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 ### ECC ComboBox
 
 - Options: `L — 7% recovery`, `M — 15% recovery`, `Q — 25% recovery (default)`, `H — 30% recovery`
-- ⓘ tooltip: `"Higher recovery = smaller data capacity. Q is a good default."`
+- ⓘ button next to the ComboBox opens `HelpWindow` (full Estonian user guide). Higher recovery = smaller data capacity; Q is the default.
 
-### Toggle Switches (Overlay and Capture sections)
+### Toggle Switches (Overlay and OCR sections)
 
 Toggle switches use a custom `CheckBox` template styled as a Windows 11-style pill toggle (40×20 px track, `#CCCCCC` off / `#0078D4` on, 16 px white thumb). The template is defined as `Style x:Key="ToggleSwitch"` in `SettingsWindow.xaml` resources.
 
-| Toggle | Default | Behaviour |
-|---|---|---|
-| Show OCR Region button | Off | Controls `Visibility.Collapsed/Visible` of the OCR button in `OverlayWindow` |
+| Toggle | Section | Default | Behaviour |
+|---|---|---|---|
+| Show OCR Region button | Overlay | Off | Controls `Visibility.Collapsed/Visible` of the OCR button in `OverlayWindow` |
+| Upscale region before recognition | OCR | On | When set, `OcrService` bicubic-upscales the captured bitmap (≤ 3×, clamped to 4800 px) before passing it to `Windows.Media.Ocr` — improves recognition of small fonts. |
+| Preserve line breaks in result | OCR | On | When set, recognised lines are joined with `\n`; otherwise with a single space. Useful for preserving table or list structure. |
 
 ### Startup Checkbox
 

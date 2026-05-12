@@ -8,6 +8,9 @@ internal sealed class TextSanitizerService
 
     public TextSanitizerService(IEnumerable<SanitizerRule> rules)
     {
+        // Pre-compile regex rules at construction so each Sanitize() call on the
+        // capture hot-path doesn't re-parse the pattern. Plain rules skip the
+        // regex engine entirely via string.Replace below.
         _rules = rules.Select(r => (
             r.Match,
             r.Replace,

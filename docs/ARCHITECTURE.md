@@ -10,7 +10,7 @@ QrApp is a single-process WPF application targeting `net8.0-windows10.0.22000.0`
 │                                                                      │
 │  ┌───────────────┐  hotkey   ┌──────────────────────────────────┐   │
 │  │ HotkeyService │──────────▶│  SelectionService                │   │
-│  └───────────────┘           │  (Ctrl+C → clipboard poll)       │   │
+│  └───────────────┘           │  (reads Clipboard directly)      │   │
 │                              │                                  │   │
 │                              │  empty? → "Nothing to encode"    │   │
 │                              └─────────────┬────────────────────┘   │
@@ -79,26 +79,25 @@ void Unregister();
 
 ### SelectionService
 
-Captures the currently selected text by synthesising `Ctrl+C`.
+Reads text directly from the system clipboard. The user copies with `Ctrl+C` *before* pressing the hotkey — no input synthesis is performed.
 
 **Algorithm:**
 
-1. Save clipboard contents.
-2. Clear clipboard (with retry — see below).
-3. `SendInput`: VK_CONTROL down → VK_C down → VK_C up → VK_CONTROL up.
-4. Poll `Clipboard.ContainsText()` for up to 300 ms.
-5. Read text; restore clipboard.
-6. Return text, or empty string if nothing captured.
+1. Call `Clipboard.ContainsText()` / `Clipboard.GetText()`.
+2. On `COMException` / `ExternalException` (clipboard locked), wait 25 ms and retry.
+3. After 8 failed retries (~200 ms total), return empty string.
 
-**Clipboard retry:** All `Clipboard.*` entry points can throw `COMException 0x800401D0` (`CLIPBRD_E_CANT_OPEN`) when another process (antivirus, clipboard manager, etc.) holds the clipboard. A `TryClipboardActionAsync` helper retries up to 8 times with 25 ms back-off before giving up and returning empty.
+**Why no `SendInput`:** an earlier iteration synthesised `Ctrl+C` from the hotkey handler, but the modifiers from the hotkey itself contaminated the injected keystrokes (e.g. `Ctrl+Shift+Q` made Chrome receive `Ctrl+Shift+C` → DevTools) and different applications responded differently. Reading the clipboard directly is simpler, faster, and works in every app.
+
+**Clipboard retry:** `Clipboard.*` entry points can throw `COMException 0x800401D0` (`CLIPBRD_E_CANT_OPEN`) when another process (RDP clip-sync, antivirus, clipboard manager) holds the clipboard. The retry loop (8 × 25 ms) covers transient locks.
 
 **Edge cases:**
 
 | Scenario | Handling |
 |---|---|
-| App ignores Ctrl+C | Returns empty → "Nothing to encode" tray notification |
+| Nothing copied (clipboard empty or non-text) | Returns empty → "Nothing to encode" tray notification |
 | Clipboard locked | Retry 8× with 25 ms back-off; return empty on all failures |
-| Only whitespace selected | Treated as empty after sanitization |
+| Only whitespace on clipboard | Treated as empty after sanitization |
 | Text exceeds QR v40 limit | `QrCodeService` throws; overlay shows error |
 
 ### OcrService
@@ -108,32 +107,30 @@ One mode — manual region selection. There is no automatic OCR fallback; OCR is
 **Manual region** (called after user draws a region in `RegionSelectorWindow`):
 
 1. Receive `System.Drawing.Rectangle` from `RegionSelectorWindow`.
-2. Capture exactly that screen rectangle.
-3. Same OCR pipeline as above.
+2. Capture exactly that screen rectangle into a `Bitmap`.
+3. If `OcrConfig.UpscaleEnabled` (default `true`), bicubic-upscale the bitmap (max 3×, clamped to ≤ 4800 px to stay under the Windows OCR engine's 5000 px input limit). Small text recognises far more reliably after upscale.
+4. Encode to PNG → decode via `BitmapDecoder` → `SoftwareBitmap`.
+5. `OcrEngine.RecognizeAsync`; join recognised lines with `\n` if `OcrConfig.PreserveLines`, otherwise with a single space.
 
 ```csharp
 internal sealed class OcrService
 {
     private readonly OcrEngine _engine =
         OcrEngine.TryCreateFromUserProfileLanguages() ??
-        OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en"));
+        OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en"))!;
 
-    public Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect) { ... }
+    public Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect,
+                                             OcrConfig? config = null) { ... }
+}
 
-    private async Task<string> RecognizeBitmapAsync(System.Drawing.Bitmap bmp)
-    {
-        using var ms = new MemoryStream();
-        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-        ms.Seek(0, SeekOrigin.Begin);
-        var decoder = await BitmapDecoder.CreateAsync(ms.AsRandomAccessStream());
-        var soft = await decoder.GetSoftwareBitmapAsync();
-        var result = await _engine.RecognizeAsync(soft);
-        return string.Join(" ", result.Lines.Select(l => l.Text));
-    }
+sealed class OcrConfig
+{
+    public bool UpscaleEnabled { get; set; } = true;
+    public bool PreserveLines  { get; set; } = true;
 }
 ```
 
-`OcrEngine` is created once and reused. `Windows.Media.Ocr` is available via the `net8.0-windows10.0.22000.0` TFM with no extra NuGet package.
+`OcrEngine` is created once and reused. `Windows.Media.Ocr` is available via the `net8.0-windows10.0.22000.0` TFM with no extra NuGet package. The engine prefers the user's installed language packs (`TryCreateFromUserProfileLanguages`) and falls back to English on minimal Windows installs.
 
 ### RegionSelectorWindow
 
@@ -173,20 +170,38 @@ record SanitizerRule(string Match, string Replace, bool IsRegex = false);
 
 internal sealed class TextSanitizerService
 {
-    private readonly IReadOnlyList<SanitizerRule> _rules;
+    private readonly IReadOnlyList<(string match, string replace, Regex? regex)> _rules;
+
+    public TextSanitizerService(IEnumerable<SanitizerRule> rules)
+    {
+        // Pre-compile regex rules at construction so the capture hot-path
+        // doesn't re-parse on every keystroke / capture.
+        _rules = rules.Select(r => (
+            r.Match,
+            r.Replace,
+            r.IsRegex ? new Regex(r.Match, RegexOptions.Compiled | RegexOptions.Multiline) : null
+        )).ToList();
+    }
 
     public string Sanitize(string input)
     {
-        foreach (var rule in _rules)
-            input = rule.IsRegex
-                ? Regex.Replace(input, rule.Match, rule.Replace)
-                : input.Replace(rule.Match, rule.Replace);
+        foreach (var (match, replace, regex) in _rules)
+            input = regex is not null
+                ? regex.Replace(input, replace)
+                : input.Replace(match, replace, StringComparison.Ordinal);
         return input.Trim();
     }
 }
 ```
 
-Regex instances are compiled and cached on construction. Default rules: strip BOM, zero-width spaces, soft hyphens, null bytes; normalise CRLF → LF; strip trailing whitespace per line.
+Default rules strip invisible characters that web copy often inflates the QR payload with:
+
+- `U+FEFF` BOM
+- `U+200B` zero-width space
+- `U+00AD` soft hyphen
+- `U+00A0` non-breaking space → regular space
+
+Plus `\r\n` → `\n` and a regex `\s+$` to trim trailing whitespace per line.
 
 **Temporary edits:** the overlay `TextBox` is two-way bound to `OverlayViewModel.SourceText`. Edits trigger `QrCodeService.Generate` via a 150 ms debounced `PropertyChanged` handler.
 
@@ -222,20 +237,24 @@ record QrSettings(int TargetSizePx = 300, QRCodeGenerator.ECCLevel EccLevel = QR
 
 ### OverlayWindow
 
-Borderless, `AllowsTransparency="True"` WPF window. Positioned 16 px to the right of the mouse cursor, clamped to the current monitor's work area; flips left if insufficient space.
+Borderless, `AllowsTransparency="True"` WPF window. **Centred on the work area of the monitor that contains the cursor** at open time (uses `MonitorFromPoint` + `GetMonitorInfo`), so it never appears off-screen on multi-monitor setups.
 
 - Two-column layout: editable `TextBox` (left) + QR `Image` (right).
-- **OCR button** in the header bar (hidden by default; controlled by `Overlay.ShowOcrButton` setting) — clicking it:
-  1. Hides `OverlayWindow`.
+- **Header bar**: draggable (`MouseLeftButtonDown` → `DragMove()`), excluding the button area, so the user can reposition before triggering an OCR region selection. Contains:
+  - **OCR button** (optional, left): hidden by default; controlled by `Overlay.ShowOcrButton` setting.
+  - **Help button** (`?`): opens `HelpWindow` with the embedded `JUHEND.md` user guide.
+  - **Close button** (`✕`): hides the overlay (does not destroy it — see `OnDeactivated` note below).
+- **OCR button click flow**:
+  1. Sets `_suppressDeactivate = true` and hides the overlay.
   2. Awaits `RegionSelectorWindow.SelectAsync()`.
   3. If cancelled: re-shows with previous content.
-  4. If rect received: calls `OcrService.RecognizeRegionAsync(rect)` → sanitize → generate → updates `OverlayViewModel` → re-shows.
+  4. If rect received: calls `OcrService.RecognizeRegionAsync(rect, OcrConfig)` → sanitize → generate → updates `OverlayViewModel` → re-shows.
 - `TextBox` edits regenerate QR with 150 ms debounce.
 - Status bar (single line, full width): hidden by default; amber warning at 80–100% capacity; red error above 100%.
 - Error message text: `"Too much data — edit the text to reduce it."`
 - Warning message text: `"Approaching QR capacity — consider reducing text or switching to ECC L."`
-- Dismiss: focus lost, `Esc`, or auto-dismiss timer.
-- `Deactivated` handler checks if `RegionSelectorWindow` is the newly focused window before closing — if so, does not auto-close.
+- Dismiss: focus lost, `Esc`, or `✕` button — all call `Hide()` (not `Close()`) to avoid re-entrancy when the App also closes the overlay on hotkey re-press.
+- **`_suppressDeactivate` flag**: set while a child window (Help, RegionSelector) is on top so the `OnDeactivated` handler does not auto-hide the overlay underneath it.
 
 ### SettingsWindow
 
@@ -245,13 +264,25 @@ Standard WPF window, opened from the tray right-click menu. Binds to `SettingsVi
 |---|---|
 | Press-to-record `TextBox` | Hotkey; re-registers immediately on Apply |
 | `Slider` 200–600, step 50 | QR target size (px); live preview thumbnail |
-| `ComboBox` L/M/Q/H | ECC level |
+| `ComboBox` L/M/Q/H | ECC level (with ⓘ button → opens `HelpWindow`) |
 | `CheckBox` + seconds field | Overlay auto-dismiss |
 | Toggle switch | Show OCR Region button in overlay (default: off) |
+| Toggle switch | OCR upscale region before recognition (default: on) |
+| Toggle switch | OCR preserve line breaks (default: on) |
 | `CheckBox` | Launch at Windows startup |
 | Editable rule list | Symbol filter rules (match, replace, regex, delete) |
 
 Apply saves `settings.json` and applies all changes live. Cancel discards the working copy.
+
+### HelpWindow
+
+A standalone `Window` shown when the user clicks the `?` button in the overlay header or the ⓘ button next to ECC Level in Settings. Renders the Estonian user guide:
+
+1. Reads `JUHEND.md` from the assembly as an `EmbeddedResource` — ships inside the single-file EXE.
+2. Converts markdown → HTML via Markdig (`UseAdvancedExtensions`).
+3. Wraps the HTML in a small inline stylesheet (Segoe UI, Win11 palette) and renders it in a WPF `WebBrowser` control via `NavigateToString`.
+
+Embedding the docs as a resource means no companion file or installer is required.
 
 ### SettingsService
 
@@ -313,21 +344,25 @@ internal sealed class SettingsService
     "autoDismissSeconds": 0,
     "showOcrButton": false
   },
+  "ocr": {
+    "upscaleEnabled": true,
+    "preserveLines": true
+  },
   "autostart": true,
   "sanitizer": {
     "rules": [
-      { "match": "\\uFEFF", "replace": "" },
-      { "match": "\\u200B", "replace": "" },
-      { "match": "\\u00AD", "replace": "" },
-      { "match": "\\u0000", "replace": "" },
-      { "match": "\r\n",    "replace": "\n" },
-      { "match": "\\s+$",   "replace": "", "regex": true }
+      { "match": "﻿", "replace": "" },
+      { "match": "​", "replace": "" },
+      { "match": "­", "replace": "" },
+      { "match": " ", "replace": " " },
+      { "match": "\r\n",   "replace": "\n" },
+      { "match": "\\s+$",  "replace": "", "isRegex": true }
     ]
   }
 }
 ```
 
-Unicode escape sequences are used in JSON to avoid invisible characters in the file. `SettingsService` converts them to actual characters before passing to `TextSanitizerService`.
+`System.Text.Json` serialises Unicode characters in their literal form (or as `\uXXXX` escapes, depending on the encoder), and `TextSanitizerService` consumes the `SanitizerRule` records as-is.
 
 ---
 
@@ -349,10 +384,10 @@ QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping
 
 | Thread | Responsibilities |
 |---|---|
-| UI thread (STA) | WPF, `HwndSource`, `Clipboard`, `SendInput`, `OcrService`, `RegionSelectorWindow` |
+| UI thread (STA) | WPF, `HwndSource`, `Clipboard`, `OcrService`, `RegionSelectorWindow` |
 | None (v1) | QR generation is < 20 ms on the UI thread; no background task needed |
 
-`SelectionService` and `OcrService` require STA: `SendInput`, `Clipboard`, `Graphics.CopyFromScreen`, and WinRT `SoftwareBitmap` conversion all have STA affinity.
+`SelectionService` and `OcrService` require STA: `Clipboard`, `Graphics.CopyFromScreen`, and WinRT `SoftwareBitmap` conversion all have STA affinity.
 
 ---
 
@@ -360,7 +395,7 @@ QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping
 
 | Condition | Behaviour |
 |---|---|
-| Empty selection (hotkey or double-click) | Tray balloon "Nothing to encode" for 2 s; no overlay |
+| Clipboard empty or non-text on hotkey | Tray balloon "Nothing to encode" for 2 s; no overlay |
 | `CLIPBRD_E_CANT_OPEN` | Retry 8× / 25 ms; return empty on persistent failure |
 | Text > v40 capacity | Overlay error: "Too much data — edit the text to reduce it." |
 | Text 80–100% of capacity | Overlay warning: "Approaching QR capacity — consider reducing text or switching to ECC L." |
@@ -372,9 +407,10 @@ QRCoder auto-selects the version. ECC Q (default): 25% damage recovery. Dropping
 
 ## Security Considerations
 
-- `SendInput` is restricted by UIPI — cannot interact with elevated windows (Task Manager, UAC prompts). By design; the app does not request elevation.
-- Clipboard is restored after every capture to avoid leaving sensitive data on it.
+- No keyboard or mouse input is synthesised. The app only *reads* the clipboard (no clear/restore), so it cannot interfere with the user's clipboard history or password managers.
 - All processing (QR generation, OCR) is fully local; no data leaves the machine.
+- `settings.json` is written under `%APPDATA%\QrApp\` and the autostart entry under `HKCU\…\Run` — both per-user, no elevation required.
+- The help content (`JUHEND.md`) is embedded in the EXE at build time; it is not loaded from any user-writable location at runtime.
 
 ---
 

@@ -9,6 +9,8 @@ public sealed partial class OverlayWindow : Window
     private readonly OcrService _ocrService;
     private readonly TextSanitizerService _sanitizerService;
 
+    // Set true while a modal child window (Help, region selector) is on top so
+    // OnDeactivated does not auto-hide the overlay underneath it.
     private bool _suppressDeactivate;
 
     private readonly OcrConfig _ocrConfig;

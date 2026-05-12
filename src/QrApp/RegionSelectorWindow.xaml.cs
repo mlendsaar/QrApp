@@ -79,6 +79,8 @@ public sealed partial class RegionSelectorWindow : Window
         int w = (int)Math.Abs(end.X - _start.X);
         int h = (int)Math.Abs(end.Y - _start.Y);
 
+        // Treat a near-zero drag as a misclick (user clicked but didn't drag a
+        // region). 4 px threshold avoids returning a 1×1 rect that OCR cannot use.
         var rect = w > 4 && h > 4
             ? (System.Drawing.Rectangle?)new System.Drawing.Rectangle(x, y, w, h)
             : null;

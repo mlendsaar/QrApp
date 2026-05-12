@@ -9,6 +9,9 @@ internal sealed class SelectionService
     // then presses the hotkey — no synthetic input needed.
     public string GetClipboardText()
     {
+        // Another process may hold the clipboard open (e.g. RDP clip-sync, password
+        // managers). OpenClipboard then fails with CLIPBRD_E_CANT_OPEN (0x800401D0).
+        // Retry 8 × 25 ms = 200 ms before giving up — well under the user's perception.
         for (int i = 0; i < 8; i++)
         {
             try { return Clipboard.ContainsText() ? Clipboard.GetText().Trim() : string.Empty; }

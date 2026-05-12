@@ -60,6 +60,12 @@ dotnet sln add src/QrApp/QrApp.csproj
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
+    <PackageReference Include="Markdig" Version="0.34.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embed the Estonian user guide so HelpWindow can render it at runtime -->
+    <EmbeddedResource Include="..\..\docs\JUHEND.md" LogicalName="JUHEND.md" />
   </ItemGroup>
 </Project>
 ```
@@ -73,6 +79,7 @@ cd src/QrApp
 dotnet add package QRCoder --version 1.6.0
 dotnet add package System.Drawing.Common --version 8.0.0
 dotnet add package Microsoft.Xaml.Behaviors.Wpf --version 1.1.77
+dotnet add package Markdig --version 0.34.0
 ```
 
 ### 4. Create the Folder Structure
@@ -91,15 +98,22 @@ Services/OcrService.cs
 Services/TextSanitizerService.cs
 Services/QrCodeService.cs
 Services/SettingsService.cs
+Services/AppSettings.cs
+Services/SanitizerRule.cs
 ViewModels/OverlayViewModel.cs
 ViewModels/SettingsViewModel.cs
 Helpers/NativeMethods.cs
+Helpers/Converters.cs
 OverlayWindow.xaml / .cs
 RegionSelectorWindow.xaml / .cs
 SettingsWindow.xaml / .cs
-Assets/icon.ico            ← 256×256 (drawn; see tasks/todo.md Phase 1)
-Assets/tray-icon.ico       ← 16×16 and 32×32 (drawn; see tasks/todo.md Phase 1)
+HelpWindow.xaml / .cs       ← renders embedded JUHEND.md via Markdig + WebBrowser
+GlobalUsings.cs             ← resolves WPF vs WinForms type aliases
+Assets/icon.ico             ← 256×256 (drawn; see tasks/todo.md Phase 1)
+Assets/tray-icon.ico        ← 16×16 and 32×32 (drawn; see tasks/todo.md Phase 1)
 ```
+
+NuGet packages required at runtime: `QRCoder`, `System.Drawing.Common`, `Microsoft.Xaml.Behaviors.Wpf`, `Markdig` (for `HelpWindow`).
 
 ---
 
@@ -108,16 +122,17 @@ Assets/tray-icon.ico       ← 16×16 and 32×32 (drawn; see tasks/todo.md Phase
 Build in this sequence — each step is independently runnable:
 
 1. **`NativeMethods.cs`** — P/Invoke signatures only; no logic.
-2. **`HotkeyService.cs`** — Register hotkey; verify `WM_HOTKEY` fires in debug output.
-3. **`SettingsService.cs`** — Load/save JSON; verify corruption handling manually.
-5. **`TextSanitizerService.cs`** — Rule engine with default rules; verify manually.
-6. **`SelectionService.cs`** — Clipboard capture via `SendInput` with retry helper.
-7. **`OcrService.cs`** — Manual region mode only; verify manually against on-screen text.
-8. **`QrCodeService.cs`** — Generate QR; derive `PixelsPerModule` from `TargetSizePx`; verify output is scannable.
-9. **`OverlayViewModel.cs`** — `QrImage`, `SourceText`, `StatusText`; wire 150 ms debounce.
-10. **`RegionSelectorWindow.xaml`** — Fullscreen transparent canvas, mouse selection, returns `Rectangle?`.
-11. **`OverlayWindow.xaml`** — TextBox, QR image, OCR button (hidden by default), status bar; wire to ViewModel.
-12. **`SettingsViewModel.cs`** + **`SettingsWindow.xaml`** — Working copy, Apply/Cancel, all controls including toggle switches.
+2. **`HotkeyService.cs`** — Register hotkey on a message-only `HwndSource`; verify `WM_HOTKEY` fires.
+3. **`SettingsService.cs`** + **`AppSettings.cs`** — Load/save JSON; verify corruption handling manually.
+4. **`TextSanitizerService.cs`** — Pre-compiled regex rule engine with default rules; verify manually.
+5. **`SelectionService.cs`** — Direct clipboard read with retry on `CLIPBRD_E_CANT_OPEN` (no input synthesis).
+6. **`OcrService.cs`** — Manual region mode with optional upscale and line-break preservation; verify against on-screen text.
+7. **`QrCodeService.cs`** — Generate QR; derive `PixelsPerModule` from `TargetSizePx`; verify output is scannable.
+8. **`OverlayViewModel.cs`** — `QrImage`, `SourceText`, `StatusText`; wire 150 ms debounce.
+9. **`RegionSelectorWindow.xaml`** — Fullscreen transparent canvas, mouse selection, returns `Rectangle?`.
+10. **`HelpWindow.xaml`** — `WebBrowser` rendering embedded `JUHEND.md` via Markdig.
+11. **`OverlayWindow.xaml`** — TextBox, QR image, draggable header bar with OCR / Help / Close buttons, status bar; wire to ViewModel.
+12. **`SettingsViewModel.cs`** + **`SettingsWindow.xaml`** — Working copy, Apply/Cancel, all controls including OCR toggle switches.
 13. **`App.xaml.cs`** — Compose everything; tray icon; `RunCapturePipelineAsync`; overlay-already-open handling.
 
 ---
@@ -133,50 +148,55 @@ internal static class NativeMethods
 {
     [DllImport("user32.dll")] internal static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
     [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-    [DllImport("user32.dll", SetLastError = true)] internal static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out POINT lpPoint);
     [DllImport("user32.dll")] internal static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
     [DllImport("user32.dll")] internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-    internal const int  WM_HOTKEY            = 0x0312;
-    internal const int  MOD_CONTROL          = 0x0002;
-    internal const int  MOD_SHIFT            = 0x0004;
-    internal const int  VK_C                 = 0x43;
-    internal const uint INPUT_KEYBOARD       = 1;
-    internal const uint KEYEVENTF_KEYUP      = 0x0002;
+    internal const int  WM_HOTKEY                = 0x0312;
     internal const uint MONITOR_DEFAULTTONEAREST = 2;
 
-    [StructLayout(LayoutKind.Sequential)] internal struct POINT  { public int X, Y; }
-    [StructLayout(LayoutKind.Sequential)] internal struct RECT   { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] internal struct POINT { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] internal struct RECT  { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     internal struct MONITORINFO { public int cbSize; public RECT rcMonitor, rcWork; public uint dwFlags; }
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct KEYBDINPUT { public ushort wVk, wScan; public uint dwFlags, time; public IntPtr dwExtraInfo; }
-    [StructLayout(LayoutKind.Explicit)]
-    internal struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(4)] public KEYBDINPUT ki; }
 }
 ```
 
+No `SendInput` / `INPUT` / `KEYBDINPUT` are needed — the app reads the clipboard directly. `MonitorFromPoint` + `GetMonitorInfo` are used by `OverlayWindow.PositionNearCursor` to centre the overlay on the active monitor's work area.
+
 ### HotkeyService.cs
+
+Creates its own message-only window (`HWND_MESSAGE`, parent handle `-3`) — no main `Window` required.
 
 ```csharp
 internal sealed class HotkeyService : IDisposable
 {
-    private const int Id = 9001;
+    private const int HotkeyId = 9001;
     private HwndSource? _source;
     public event EventHandler? HotkeyPressed;
 
     public void Register(ModifierKeys modifiers, Key key)
     {
-        _source = HwndSource.FromHwnd(new WindowInteropHelper(Application.Current.MainWindow!).EnsureHandle());
+        Unregister();
+        var parms = new HwndSourceParameters("QrApp_HotkeySource")
+        {
+            ParentWindow = new IntPtr(-3), // HWND_MESSAGE
+            WindowStyle  = 0,
+            Width = 0, Height = 0,
+        };
+        _source = new HwndSource(parms);
         _source.AddHook(WndProc);
-        if (!NativeMethods.RegisterHotKey(_source.Handle, Id, (uint)modifiers, (uint)KeyInterop.VirtualKeyFromKey(key)))
-            throw new InvalidOperationException("Hotkey is already registered by another application.");
+
+        uint vk = (uint)KeyInterop.VirtualKeyFromKey(key);
+        if (!NativeMethods.RegisterHotKey(_source.Handle, HotkeyId, (uint)modifiers, vk))
+            throw new InvalidOperationException("The hotkey is already registered by another application.");
     }
+
+    public void Unregister() { /* unhook + dispose _source */ }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == Id)
+        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == HotkeyId)
         {
             HotkeyPressed?.Invoke(this, EventArgs.Empty);
             handled = true;
@@ -184,70 +204,35 @@ internal sealed class HotkeyService : IDisposable
         return IntPtr.Zero;
     }
 
-    public void Dispose()
-    {
-        if (_source is not null) NativeMethods.UnregisterHotKey(_source.Handle, Id);
-    }
+    public void Dispose() => Unregister();
 }
 ```
 
 ### SelectionService.cs
 
+No input synthesis. The user copies with `Ctrl+C` first, then presses the hotkey — the service simply reads the clipboard, retrying briefly on the transient lock that can happen when another process (RDP clip-sync, antivirus, clipboard manager) holds it.
+
 ```csharp
 internal sealed class SelectionService
 {
-    public async Task<string> GetSelectedTextAsync()
+    public string GetClipboardText()
     {
-        IDataObject? saved = null;
-        try { saved = Clipboard.GetDataObject(); } catch { }
-
-        // Clipboard may be locked briefly; retry before giving up
-        if (!await TryClipboardActionAsync(() => Clipboard.Clear()))
-            return string.Empty;
-
-        SendCtrlC();
-
-        var deadline = DateTime.UtcNow.AddMilliseconds(300);
-        string result = string.Empty;
-        while (DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(30);
-            try { if (Clipboard.ContainsText()) { result = Clipboard.GetText(); break; } }
-            catch { await Task.Delay(20); }
-        }
-
-        try { if (saved is not null) Clipboard.SetDataObject(saved, true); } catch { }
-        return result.Trim();
-    }
-
-    // Retries a clipboard action up to 8 times with 25 ms back-off.
-    private static async Task<bool> TryClipboardActionAsync(Action action)
-    {
+        // 8 × 25 ms ≈ 200 ms total — well under the user's perception of latency.
         for (int i = 0; i < 8; i++)
         {
-            try { action(); return true; }
-            catch (COMException) { }
+            try { return Clipboard.ContainsText() ? Clipboard.GetText().Trim() : string.Empty; }
+            catch (COMException) { }     // CLIPBRD_E_CANT_OPEN (0x800401D0)
             catch (ExternalException) { }
-            await Task.Delay(25);
+            System.Threading.Thread.Sleep(25);
         }
-        return false;
-    }
-
-    private static void SendCtrlC()
-    {
-        var inputs = new NativeMethods.INPUT[4];
-        inputs[0].type = NativeMethods.INPUT_KEYBOARD; inputs[0].ki.wVk = 0x11;           // Ctrl down
-        inputs[1].type = NativeMethods.INPUT_KEYBOARD; inputs[1].ki.wVk = NativeMethods.VK_C; // C down
-        inputs[2].type = NativeMethods.INPUT_KEYBOARD; inputs[2].ki.wVk = NativeMethods.VK_C;
-        inputs[2].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP;                                  // C up
-        inputs[3].type = NativeMethods.INPUT_KEYBOARD; inputs[3].ki.wVk = 0x11;
-        inputs[3].ki.dwFlags = NativeMethods.KEYEVENTF_KEYUP;                                  // Ctrl up
-        NativeMethods.SendInput(4, inputs, Marshal.SizeOf<NativeMethods.INPUT>());
+        return string.Empty;
     }
 }
 ```
 
 ### OcrService.cs
+
+Manual region only — no auto-cursor mode. Upscales the captured bitmap (bicubic, ≤ 3×, clamped to 4800 px max-dimension to stay under the Windows OCR engine's 5000 px input limit) when `OcrConfig.UpscaleEnabled` is set, dramatically improving recognition of small fonts.
 
 ```csharp
 using Windows.Media.Ocr;
@@ -257,21 +242,34 @@ internal sealed class OcrService
 {
     private readonly OcrEngine _engine =
         OcrEngine.TryCreateFromUserProfileLanguages() ??
-        OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en"));
+        OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en"))!;
 
-    public async Task<string> RecognizeCursorRegionAsync()
-    {
-        NativeMethods.GetCursorPos(out var pt);
-        var region = new System.Drawing.Rectangle(pt.X - 300, pt.Y - 200, 600, 400);
-        return await RecognizeRegionAsync(region);
-    }
-
-    public async Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect)
+    public async Task<string> RecognizeRegionAsync(System.Drawing.Rectangle screenRect,
+                                                   OcrConfig? config = null)
     {
         using var bmp = new System.Drawing.Bitmap(screenRect.Width, screenRect.Height);
         using (var g = System.Drawing.Graphics.FromImage(bmp))
             g.CopyFromScreen(screenRect.Location, System.Drawing.Point.Empty, screenRect.Size);
 
+        var toRecognize = (config?.UpscaleEnabled ?? true) ? Upscale(bmp) : bmp;
+        try { return await RecognizeBitmapAsync(toRecognize, config?.PreserveLines ?? true); }
+        finally { if (!ReferenceEquals(toRecognize, bmp)) toRecognize.Dispose(); }
+    }
+
+    private static System.Drawing.Bitmap Upscale(System.Drawing.Bitmap bmp)
+    {
+        int maxDim = Math.Max(bmp.Width, bmp.Height);
+        int scale  = Math.Min(3, 4800 / Math.Max(1, maxDim));
+        if (scale <= 1) return bmp;
+        var scaled = new System.Drawing.Bitmap(bmp.Width * scale, bmp.Height * scale);
+        using var g = System.Drawing.Graphics.FromImage(scaled);
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.DrawImage(bmp, 0, 0, scaled.Width, scaled.Height);
+        return scaled;
+    }
+
+    private async Task<string> RecognizeBitmapAsync(System.Drawing.Bitmap bmp, bool preserveLines)
+    {
         using var ms = new MemoryStream();
         bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
         ms.Seek(0, SeekOrigin.Begin);
@@ -279,7 +277,8 @@ internal sealed class OcrService
         var decoder = await BitmapDecoder.CreateAsync(ms.AsRandomAccessStream());
         var soft    = await decoder.GetSoftwareBitmapAsync();
         var result  = await _engine.RecognizeAsync(soft);
-        return string.Join(" ", result.Lines.Select(l => l.Text));
+        var sep     = preserveLines ? "\n" : " ";
+        return string.Join(sep, result.Lines.Select(l => l.Text));
     }
 }
 ```
@@ -447,12 +446,12 @@ Output: `publish/QrApp.exe` (~70 MB). Runs on any Windows 11 machine with no pre
 | Problem | Solution |
 |---|---|
 | Hotkey not firing | Use `nirsoft HotkeysList` to check conflicts. Change hotkey in Settings. |
-| Empty selection | Test in Notepad first. Some apps (Electron, terminals) ignore synthesised `Ctrl+C` — use the OCR Region button in the overlay as a manual fallback (enable it in Settings → Overlay). |
+| Empty selection | Confirm the user actually copied (`Ctrl+C`) before pressing the hotkey — the app reads the clipboard, it does not synthesise input. For apps where the user cannot copy (image viewers, terminals), enable Settings → Overlay → Show OCR Region button and use it as a manual fallback. |
 | Overlay flickers | Ensure both `AllowsTransparency="True"` and `WindowStyle="None"` are set; `Background` must be non-null. |
 | QR looks blurry | Set `RenderOptions.BitmapScalingMode="NearestNeighbor"` and `UseLayoutRounding="True"` on the overlay window. |
-| Clipboard restore fails | `Clipboard.SetDataObject` with OLE objects is best-effort; catch and ignore. |
+| Clipboard read fails persistently | Another process holds the clipboard (RDP clip-sync, antivirus, clipboard manager). The 8 × 25 ms retry handles transient locks; if the lock outlives the retry, the capture returns empty and the tray shows "Nothing to encode". |
 | RegionSelector not covering all monitors | Check that `Left/Top/Width/Height` are set from `SystemParameters.VirtualScreen*` properties. |
-| OCR returns empty | Ensure the region has sufficient contrast and text size; `OcrEngine` may not detect very small fonts. |
+| OCR returns empty | Confirm OCR upscale is enabled in Settings → OCR (default on). Also check region contrast and font size; `OcrEngine` cannot reliably detect very small or low-contrast text. |
 
 ---
 
@@ -460,7 +459,7 @@ Output: `publish/QrApp.exe` (~70 MB). Runs on any Windows 11 machine with no pre
 
 - Nullable reference types enabled; no `!` suppressions without a comment explaining why.
 - File-scoped namespaces (`namespace QrApp;`).
-- Records for immutable data (`QrSettings`, `AppSettings`, `SanitizerRule`, `HotkeyConfig`).
+- Records for immutable data (`QrSettings`, `SanitizerRule`). Settings classes (`AppSettings`, `HotkeyConfig`, `QrCodeConfig`, `OverlayConfig`, `OcrConfig`, `SanitizerConfig`) are `sealed class` with public setters so `System.Text.Json` can populate them from `settings.json`.
 - `sealed` on all concrete service and window classes.
 - Services composed manually in `App.xaml.cs` — no DI container.
 - Comments only for non-obvious Win32 behaviour or invariants.
