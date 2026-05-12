@@ -15,7 +15,7 @@ public sealed partial class OverlayWindow : Window
 
     private readonly OcrConfig _ocrConfig;
 
-    internal OverlayWindow(OverlayViewModel vm, OcrService ocrService, TextSanitizerService sanitizerService, bool showOcrButton = false, OcrConfig? ocrConfig = null)
+    internal OverlayWindow(OverlayViewModel vm, OcrService ocrService, TextSanitizerService sanitizerService, bool showOcrButton = false, OcrConfig? ocrConfig = null, int targetSizePx = 300)
     {
         _vm               = vm;
         _ocrService       = ocrService;
@@ -25,6 +25,16 @@ public sealed partial class OverlayWindow : Window
         vm.RequestClose = Hide;  // X button and Escape hide, not close
         DataContext = vm;
         InitializeComponent();
+
+        // Scale the window so the QR image renders at its requested pixel size.
+        // Both columns are *-sized, so the QR column ≈ Width/2. We want that
+        // column ≥ targetSizePx + padding (16 px margin around the image).
+        // Mirror the same width on the TextBox column for visual balance.
+        const int Padding = 16;
+        const int Header  = 32;
+        const int Status  = 32;
+        Width  = 2 * (targetSizePx + Padding) + Padding;
+        Height = Header + Padding + targetSizePx + Padding + Status;
 
         OcrButton.Visibility = showOcrButton ? Visibility.Visible : Visibility.Collapsed;
 

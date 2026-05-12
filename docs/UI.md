@@ -69,10 +69,15 @@ The header bar acts as a drag handle (`MouseLeftButtonDown` → `DragMove()`); c
 
 ### Sizing
 
-- Default: **560 × 300 px**
-- TextBox column: 50%, QR column: 50%
-- Minimum: **400 × 240 px**
+The overlay scales with the **QR target size** from settings (`Qr.TargetSizePx`, range 200–600 px) so the QR renders at exactly the requested pixel size on screen:
+
+- Width  = `2 × (TargetSizePx + 16) + 16`  → at 300 px: 648 px wide, at 600 px: 1248 px wide
+- Height = `32 + 16 + TargetSizePx + 16 + 32` (header + padding + image + padding + status) → at 300 px: 396 px, at 600 px: 696 px
+- TextBox column: 50 %, QR column: 50 % — both grow together so the layout stays symmetric
+- XAML minimum (floor): **400 × 240 px**
 - Status bar: 32 px tall, always reserved (opacity toggled, no layout shift)
+
+The window size is computed in the `OverlayWindow` constructor from the value passed in by `App.RunCapturePipelineAsync`; changing the slider in Settings takes effect on the next overlay open.
 
 ### Header Bar
 

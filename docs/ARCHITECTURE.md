@@ -239,6 +239,8 @@ record QrSettings(int TargetSizePx = 300, QRCodeGenerator.ECCLevel EccLevel = QR
 
 Borderless, `AllowsTransparency="True"` WPF window. **Centred on the work area of the monitor that contains the cursor** at open time (uses `MonitorFromPoint` + `GetMonitorInfo`), so it never appears off-screen on multi-monitor setups.
 
+**Window size is derived from `Qr.TargetSizePx`** in the `OverlayWindow` constructor so the QR image renders at the user's chosen pixel size. With both content columns set to `*`, the QR column ends up ≈ `TargetSizePx + 16` px wide, making `Stretch="Uniform"` paint the QR at (close to) its native size rather than down-scaling it into a fixed 268 px column.
+
 - Two-column layout: editable `TextBox` (left) + QR `Image` (right).
 - **Header bar**: draggable (`MouseLeftButtonDown` → `DragMove()`), excluding the button area, so the user can reposition before triggering an OCR region selection. Contains:
   - **OCR button** (optional, left): hidden by default; controlled by `Overlay.ShowOcrButton` setting.
