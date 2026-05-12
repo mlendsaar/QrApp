@@ -87,7 +87,9 @@ QrApp/
 - Open near the mouse cursor, clamped to the current monitor
 - Show captured text in an editable `TextBox` alongside the QR code
 - Regenerate QR in real time as the user edits (150 ms debounce)
-- **OCR button** (hidden by default; enable in Settings → Overlay): hides overlay, shows `RegionSelectorWindow` for user to draw a screen region; OCRs that region and populates the text box
+- **OCR button** (hidden by default; enable in Settings → OCR): hides overlay, shows `RegionSelectorWindow` for user to draw a screen region; OCRs that region and populates the text box
+- **Pin toggle** (`📌`): when enabled, the overlay stays open after losing focus instead of auto-hiding; default off, persisted under Settings → Overlay → Pin overlay
+- **Clipboard-watch toggle** (`👁`): when enabled, the overlay polls the clipboard every ~500 ms and regenerates the QR whenever new text is copied; default off, persisted under Settings → Overlay → Watch clipboard
 - Status bar: warning at 80–100% QR capacity; error above 100% ("Too much data — edit the text to reduce it.")
 - Dismiss on focus loss or `Esc`; optional auto-dismiss timer
 - If hotkey pressed while overlay is open: close the current overlay and open a fresh one
@@ -107,7 +109,9 @@ QrApp/
 - QR target size slider (200–600 px)
 - ECC level dropdown (L / M / Q / H)
 - Overlay auto-dismiss toggle + seconds
-- **Show OCR Region button** toggle switch (default: off)
+- **Pin overlay** toggle switch (default: off) — prevents auto-hide on focus loss
+- **Watch clipboard** toggle switch (default: off) — auto-regenerates QR on clipboard change
+- **Show OCR Region button** toggle switch (default: off) — grouped under OCR settings
 - Launch at Windows startup toggle (default: on)
 - Symbol filter rule list (match, replacement, regex toggle, add/delete)
 - Apply saves immediately; Cancel discards changes

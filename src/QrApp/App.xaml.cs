@@ -102,7 +102,16 @@ public sealed partial class App : System.Windows.Application
         {
             HotkeyLabel = _settings.Hotkey.ToLabel(),
         };
-        _overlay = new OverlayWindow(vm, _ocrService, _sanitizerService, _settings.Overlay.ShowOcrButton, _settings.Ocr, _settings.Qr.TargetSizePx);
+        _overlay = new OverlayWindow(
+            vm,
+            _ocrService,
+            _sanitizerService,
+            _selectionService,
+            _settings.Overlay.ShowOcrButton,
+            _settings.Ocr,
+            _settings.Qr.TargetSizePx,
+            _settings.Overlay.PinOverlay,
+            _settings.Overlay.WatchClipboard);
         _overlay.PositionNearCursor();
         _overlay.Closed += (_, _) => _overlay = null;
         _overlay.SetInitialText(text);

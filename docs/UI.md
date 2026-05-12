@@ -51,18 +51,18 @@ The overlay opens on every capture. It must appear fast and require minimal inte
 ### Layout
 
 ```
-┌──────────────────────────────────────────────┐
-│  [⬡ OCR Region] (hidden by default)   [?] [✕]│  ← 32 px header (draggable)
-├─────────────────────┬────────────────────────┤
-│                     │                        │
-│  [Editable TextBox  │   QR code image        │
-│   captured / OCR'd  │   (square, fills       │
-│   text goes here]   │   column minus 16 px   │
-│                     │   padding each side)   │
-│  142 / 1 663 bytes  │                        │
-├─────────────────────┴────────────────────────┤
-│ ⚠ Warning / ✗ Error message (if any)        │  ← status bar, colored bg
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  [⬡ OCR Region] (hidden)   [📌] [👁] [?] [✕]        │  ← 32 px header (draggable)
+├─────────────────────┬────────────────────────────────┤
+│                     │                                │
+│  [Editable TextBox  │   QR code image                │
+│   captured / OCR'd  │   (square, fills               │
+│   text goes here]   │   column minus 16 px           │
+│                     │   padding each side)           │
+│  142 / 1 663 bytes  │                                │
+├─────────────────────┴────────────────────────────────┤
+│ ⚠ Warning / ✗ Error message (if any)                │  ← status bar, colored bg
+└──────────────────────────────────────────────────────┘
 ```
 
 The header bar acts as a drag handle (`MouseLeftButtonDown` → `DragMove()`); clicks on the buttons themselves are excluded so they fire normally.
@@ -82,6 +82,8 @@ The window size is computed in the `OverlayWindow` constructor from the value pa
 ### Header Bar
 
 - **OCR Region button** (left): hidden by default (`Visibility.Collapsed`); shown when `Overlay.ShowOcrButton = true` in settings. Triggers `RegionSelectorWindow`; icon is a crosshair glyph from Segoe Fluent Icons.
+- **Pin toggle** (`📌`, right of OCR): `ToggleButton` that mirrors and updates the `Overlay.PinOverlay` setting for the current overlay session. When checked, `OnDeactivated` no-ops so the overlay stays visible after losing focus. `Esc`, the `✕` button, and re-pressing the hotkey still close the overlay.
+- **Clipboard-watch toggle** (`👁`): `ToggleButton` that mirrors and updates the `Overlay.WatchClipboard` setting. When checked, a 500 ms `DispatcherTimer` polls `SelectionService.GetClipboardText()`, runs the result through the sanitizer, and pushes any change into the overlay view model — driving a fresh QR generation through the existing debounce. The baseline text is captured when the toggle is enabled so the initial clipboard state does not trigger a spurious update.
 - **Help button** (`?`, right): opens `HelpWindow` (a `WebBrowser`-backed window that renders the embedded Estonian user guide `JUHEND.md` via Markdig).
 - **Close button** (`✕`, right): hides the overlay (does not destroy it); same as `Esc`. 32×32 px touch target.
 
@@ -174,9 +176,11 @@ A standard modal dialog opened from the tray right-click menu. Not a floating ov
 │                                                  │
 │  Overlay                                         │
 │  Auto-dismiss  [✓]  after  [5]  seconds          │
-│  [○] Show OCR Region button in overlay           │  ← toggle switch (default off)
+│  [○] Pin overlay (do not auto-hide)              │  ← toggle switch (default off)
+│  [○] Watch clipboard (auto-regenerate)           │  ← toggle switch (default off)
 │                                                  │
 │  OCR                                             │
+│  [○] Show OCR Region button in overlay           │  ← toggle switch (default off)
 │  [●] Upscale region before recognition           │  ← toggle switch (default on)
 │  [●] Preserve line breaks in result              │  ← toggle switch (default on)
 │                                                  │
@@ -227,7 +231,9 @@ Toggle switches use a custom `CheckBox` template styled as a Windows 11-style pi
 
 | Toggle | Section | Default | Behaviour |
 |---|---|---|---|
-| Show OCR Region button | Overlay | Off | Controls `Visibility.Collapsed/Visible` of the OCR button in `OverlayWindow` |
+| Pin overlay | Overlay | Off | Initial state for the overlay `📌` header toggle; when on, `OnDeactivated` does not auto-hide the overlay. |
+| Watch clipboard | Overlay | Off | Initial state for the overlay `👁` header toggle; when on, a 500 ms `DispatcherTimer` polls the clipboard via `SelectionService` and pushes new sanitized text into the overlay VM. |
+| Show OCR Region button | OCR | Off | Controls `Visibility.Collapsed/Visible` of the OCR button in `OverlayWindow`. Grouped with the OCR settings so all OCR-related controls live together. |
 | Upscale region before recognition | OCR | On | When set, `OcrService` bicubic-upscales the captured bitmap (≤ 3×, clamped to 4800 px) before passing it to `Windows.Media.Ocr` — improves recognition of small fonts. |
 | Preserve line breaks in result | OCR | On | When set, recognised lines are joined with `\n`; otherwise with a single space. Useful for preserving table or list structure. |
 

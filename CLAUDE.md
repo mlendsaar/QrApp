@@ -53,6 +53,7 @@ HotkeyService → SelectionService (SendInput Ctrl+C → clipboard poll)
 - **`SettingsService`** resets `settings.json` to defaults silently on any load exception (missing, locked, malformed JSON). Autostart is applied via `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`.
 - **`HotkeyService`** uses a hidden `HwndSource` (message-only window) for `RegisterHotKey`. If the hotkey is pressed while an overlay is already open, the existing overlay closes and a fresh capture runs.
 - **`OverlayViewModel`** debounces `SourceText` changes by 150 ms before regenerating the QR.
+- **`OverlayWindow` header toggles:** `📌` (pin) suppresses `OnDeactivated`-driven auto-hide; `👁` (watch clipboard) starts a 500 ms `DispatcherTimer` that re-runs the sanitize/generate pipeline on any clipboard change. Both default from `Overlay.PinOverlay` / `Overlay.WatchClipboard` in settings.
 - **Status bar thresholds:** warning at 80–100% of QR v40 capacity; error above 100%.
 
 ### Settings schema (`%APPDATA%\QrApp\settings.json`)
@@ -61,7 +62,8 @@ HotkeyService → SelectionService (SendInput Ctrl+C → clipboard poll)
 {
   "hotkey": { "modifiers": "Control,Shift", "key": "F2" },
   "qr": { "targetSizePx": 300, "eccLevel": "Q" },
-  "overlay": { "autoDismissSeconds": 0 },
+  "overlay": { "autoDismissSeconds": 0, "showOcrButton": false, "pinOverlay": false, "watchClipboard": false },
+  "ocr": { "upscaleEnabled": true, "preserveLines": true },
   "autostart": true,
   "sanitizer": { "rules": [...] }
 }
